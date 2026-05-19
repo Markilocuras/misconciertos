@@ -62,26 +62,26 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.984 0.003 247.858);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --radius: 0.75rem;
+  --background: oklch(0.16 0.02 270);
+  --foreground: oklch(0.97 0.005 270);
+  --card: oklch(0.20 0.025 270);
+  --card-foreground: oklch(0.97 0.005 270);
+  --popover: oklch(0.20 0.025 270);
+  --popover-foreground: oklch(0.97 0.005 270);
+  --primary: oklch(0.78 0.18 60);
+  --primary-foreground: oklch(0.18 0.02 270);
+  --secondary: oklch(0.26 0.03 270);
+  --secondary-foreground: oklch(0.97 0.005 270);
+  --muted: oklch(0.24 0.025 270);
+  --muted-foreground: oklch(0.70 0.02 270);
+  --accent: oklch(0.28 0.04 280);
+  --accent-foreground: oklch(0.97 0.005 270);
+  --destructive: oklch(0.60 0.22 27);
+  --destructive-foreground: oklch(0.98 0.005 270);
+  --border: oklch(0.30 0.025 270);
+  --input: oklch(0.30 0.025 270);
+  --ring: oklch(0.78 0.18 60);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -141,4 +141,48 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+}
+
+/* Concert map pins */
+.concert-pin {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: var(--primary);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary) 25%, transparent),
+    0 6px 16px -4px color-mix(in oklab, var(--primary) 60%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+.concert-pin:hover { transform: scale(1.1); }
+.concert-pin span {
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--primary-foreground);
+}
+.concert-pin--active {
+  width: 36px;
+  height: 36px;
+  animation: pulse 1.8s ease-out infinite;
+}
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 60%, transparent); }
+  100% { box-shadow: 0 0 0 18px color-mix(in oklab, var(--primary) 0%, transparent); }
+}
+
+/* Leaflet dark tweaks */
+.leaflet-container { background: var(--background); font-family: inherit; }
+.leaflet-control-attribution {
+  background: color-mix(in oklab, var(--background) 80%, transparent) !important;
+  color: var(--muted-foreground) !important;
+}
+.leaflet-control-attribution a { color: var(--primary) !important; }
+.leaflet-control-zoom a {
+  background: var(--card) !important;
+  color: var(--foreground) !important;
+  border-color: var(--border) !important;
 }
