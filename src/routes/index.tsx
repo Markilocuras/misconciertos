@@ -40,7 +40,7 @@ function Index() {
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
-      <div className="absolute inset-0 md:right-[420px]">
+      <div className={`absolute inset-0 ${selected ? "md:right-[420px]" : ""}`}>
         <ConcertMap
           concerts={filtered}
           selectedId={selected?.id ?? null}
@@ -48,15 +48,12 @@ function Index() {
         />
       </div>
 
-      {/* Top bar */}
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between md:p-6 md:pr-[440px]">
+      <header className={`pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between md:p-6 ${selected ? "md:pr-[440px]" : ""}`}>
         <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border/60 bg-background/85 px-4 py-2 shadow-lg backdrop-blur-md">
           <div className="rounded-full bg-primary/15 p-1.5">
             <Music2 className="h-4 w-4 text-primary" />
           </div>
-          <h1 className="text-sm font-semibold tracking-tight">
-            Conciertos BA
-          </h1>
+          <h1 className="text-sm font-semibold tracking-tight">Conciertos BA</h1>
         </div>
         <div className="pointer-events-auto flex items-center gap-3 md:ml-auto">
           <DateFilter value={date} onChange={setDate} count={filtered.length} />
@@ -64,18 +61,16 @@ function Index() {
         </div>
       </header>
 
-
-      {/* Mobile bottom sheet */}
       {selected && (
-        <div className="absolute inset-x-0 bottom-0 z-20 max-h-[70vh] overflow-hidden rounded-t-3xl border-t border-border bg-card shadow-2xl md:hidden">
-          <ConcertDetails concert={selected} onClose={() => setSelected(null)} />
-        </div>
+        <>
+          <div className="absolute inset-x-0 bottom-0 z-20 max-h-[70vh] overflow-hidden rounded-t-3xl border-t border-border bg-card shadow-2xl md:hidden">
+            <ConcertDetails concert={selected} onClose={() => setSelected(null)} />
+          </div>
+          <aside className="absolute inset-y-0 right-0 z-10 hidden w-[420px] border-l border-border bg-card md:block">
+            <ConcertDetails concert={selected} onClose={() => setSelected(null)} />
+          </aside>
+        </>
       )}
-
-      {/* Desktop side panel */}
-      <aside className="absolute inset-y-0 right-0 z-10 hidden w-[420px] border-l border-border bg-card md:block">
-        <ConcertDetails concert={selected} onClose={() => setSelected(null)} />
-      </aside>
     </main>
   );
 }
