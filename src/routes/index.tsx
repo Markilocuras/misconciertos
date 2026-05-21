@@ -9,7 +9,9 @@ import { AuthMenu } from "@/components/AuthMenu";
 
 
 export const Route = createFileRoute("/")({
+  ssr: false,
   head: () => ({
+
     meta: [
       { title: "Mapa de Conciertos — Buenos Aires" },
       {
