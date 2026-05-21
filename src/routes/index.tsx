@@ -5,6 +5,8 @@ import { ConcertDetails } from "@/components/ConcertDetails";
 import { DateFilter } from "@/components/DateFilter";
 import { concerts as allConcerts, type Concert } from "@/data/concerts";
 import { Music2 } from "lucide-react";
+import { AuthMenu } from "@/components/AuthMenu";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -54,8 +56,12 @@ function Index() {
             Conciertos BA
           </h1>
         </div>
-        <DateFilter value={date} onChange={setDate} count={filtered.length} />
+        <div className="pointer-events-auto flex items-center gap-3 md:ml-auto">
+          <DateFilter value={date} onChange={setDate} count={filtered.length} />
+          <AuthMenu />
+        </div>
       </header>
+
 
       {/* Mobile bottom sheet */}
       {selected && (
