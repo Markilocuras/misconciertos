@@ -19,10 +19,17 @@ const activeIcon = new L.DivIcon({
   iconAnchor: [18, 18],
 });
 
+const DEFAULT_CENTER: [number, number] = [-34.6037, -58.3816];
+const DEFAULT_ZOOM = 12;
+
 function FlyTo({ concert }: { concert: Concert | null }) {
   const map = useMap();
   useEffect(() => {
-    if (concert) map.flyTo([concert.lat, concert.lng], 14, { duration: 0.8 });
+    if (concert) {
+      map.flyTo([concert.lat, concert.lng], 14, { duration: 0.8 });
+    } else {
+      map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.8 });
+    }
   }, [concert, map]);
   return null;
 }
