@@ -68,11 +68,25 @@ export function ConcertDetails({ concert, onClose }: Props) {
             <span className="text-xs uppercase text-muted-foreground">Desde</span>
             <span className="text-lg font-semibold">{concert.price}</span>
           </div>
-          <Button asChild size="lg" className="w-full">
-            <a href={concert.buyUrl} target="_blank" rel="noopener noreferrer">
-              <Ticket className="mr-2 h-4 w-4" />
-              Comprar entradas
-            </a>
+          <Button
+            size="lg"
+            className="w-full"
+            onClick={() => {
+              try {
+                fetch("/api/public/hooks/track-click", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ concertId: concert.id, buyUrl: concert.buyUrl }),
+                  keepalive: true,
+                }).catch(() => {});
+              } catch {
+                // ignore
+              }
+              window.open(concert.buyUrl, "_blank", "noopener,noreferrer");
+            }}
+          >
+            <Ticket className="mr-2 h-4 w-4" />
+            Comprar entradas
           </Button>
         </div>
       </div>

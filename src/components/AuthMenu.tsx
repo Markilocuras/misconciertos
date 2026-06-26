@@ -1,11 +1,23 @@
 import { Link } from "@tanstack/react-router";
-import { LogOut, User as UserIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+import { BarChart3, LogOut, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 
 export function AuthMenu() {
   const { user, loading } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user) {
+      setIsAdmin(false);
+      return;
+    }
+    supabase
+      .rpc("has_role", { _user_id: user.id, _role: "admin" })
+      .then(({ data }) => setIsAdmin(!!data));
+  }, [user]);
 
   if (loading) return null;
 
@@ -16,6 +28,13 @@ export function AuthMenu() {
           <UserIcon className="h-3.5 w-3.5 text-primary" />
           <span className="max-w-[160px] truncate">{user.email}</span>
         </div>
+        {isAdmin && (
+          <Button asChild size="sm" variant="ghost" className="h-7 px-2" title="Estadísticas">
+            <Link to="/admin/stats">
+              <BarChart3 className="h-3.5 w-3.5" />
+            </Link>
+          </Button>
+        )}
         <Button
           size="sm"
           variant="ghost"
