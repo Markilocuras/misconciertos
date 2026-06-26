@@ -10,7 +10,10 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedAdminStatsRouteImport } from './routes/_authenticated/admin.stats'
+import { Route as ApiPublicHooksTrackClickRouteImport } from './routes/api/public/hooks/track-click'
 import { Route as ApiPublicHooksIngestConcertsRouteImport } from './routes/api/public/hooks/ingest-concerts'
 
 const AuthRoute = AuthRouteImport.update({
@@ -18,11 +21,26 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminStatsRoute = AuthenticatedAdminStatsRouteImport.update({
+  id: '/admin/stats',
+  path: '/admin/stats',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const ApiPublicHooksTrackClickRoute =
+  ApiPublicHooksTrackClickRouteImport.update({
+    id: '/api/public/hooks/track-click',
+    path: '/api/public/hooks/track-click',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksIngestConcertsRoute =
   ApiPublicHooksIngestConcertsRouteImport.update({
     id: '/api/public/hooks/ingest-concerts',
@@ -33,31 +51,57 @@ const ApiPublicHooksIngestConcertsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
+  '/api/public/hooks/track-click': typeof ApiPublicHooksTrackClickRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
+  '/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
+  '/api/public/hooks/track-click': typeof ApiPublicHooksTrackClickRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
+  '/_authenticated/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
+  '/api/public/hooks/track-click': typeof ApiPublicHooksTrackClickRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/api/public/hooks/ingest-concerts'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/admin/stats'
+    | '/api/public/hooks/ingest-concerts'
+    | '/api/public/hooks/track-click'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/api/public/hooks/ingest-concerts'
-  id: '__root__' | '/' | '/auth' | '/api/public/hooks/ingest-concerts'
+  to:
+    | '/'
+    | '/auth'
+    | '/admin/stats'
+    | '/api/public/hooks/ingest-concerts'
+    | '/api/public/hooks/track-click'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/admin/stats'
+    | '/api/public/hooks/ingest-concerts'
+    | '/api/public/hooks/track-click'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ApiPublicHooksIngestConcertsRoute: typeof ApiPublicHooksIngestConcertsRoute
+  ApiPublicHooksTrackClickRoute: typeof ApiPublicHooksTrackClickRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -69,11 +113,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/admin/stats': {
+      id: '/_authenticated/admin/stats'
+      path: '/admin/stats'
+      fullPath: '/admin/stats'
+      preLoaderRoute: typeof AuthenticatedAdminStatsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/api/public/hooks/track-click': {
+      id: '/api/public/hooks/track-click'
+      path: '/api/public/hooks/track-click'
+      fullPath: '/api/public/hooks/track-click'
+      preLoaderRoute: typeof ApiPublicHooksTrackClickRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/hooks/ingest-concerts': {
@@ -86,10 +151,23 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminStatsRoute: typeof AuthenticatedAdminStatsRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminStatsRoute: AuthenticatedAdminStatsRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ApiPublicHooksIngestConcertsRoute: ApiPublicHooksIngestConcertsRoute,
+  ApiPublicHooksTrackClickRoute: ApiPublicHooksTrackClickRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
