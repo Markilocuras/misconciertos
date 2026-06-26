@@ -1,61 +1,47 @@
-# Plan: ingesta automática de conciertos
+# Plan: trackear clics en "Comprar entradas"
 
-Reemplazar el array hardcodeado de `src/data/concerts.ts` por una tabla en la base, alimentada cada X horas desde Ticketmaster (API oficial) + Ticketek/Allaccess (scraping con Firecrawl).
+Sí, se puede — pero hay que agregarlo, hoy el botón es un `<a href>` directo a Ticketmaster/Ticketek/Allaccess y no queda registro de nada.
 
-## Lo que vas a tener que aportar
+## Cómo lo resolvemos
 
-1. **API key de Ticketmaster Discovery API** — gratis en https://developer-acct.ticketmaster.com (la guardamos como secret `TICKETMASTER_API_KEY`).
-2. **Conectar Firecrawl** desde Lovable (un click — para Ticketek y Allaccess, que no tienen API pública).
-3. **URLs base** que querés scrapear de Ticketek/Allaccess (ej: la página de listado de Buenos Aires).
-
-## Arquitectura
+Cada vez que un usuario clickea "Comprar entradas" en `ConcertDetails.tsx`, guardamos una fila en una tabla nueva `concert_clicks` antes de mandarlo al sitio externo. Después tenés una página simple `/admin/stats` donde ves cuántos clics tuvo cada concierto.
 
 ```
-pg_cron (cada 6h)
-   └─> POST /api/public/hooks/ingest-concerts
-            ├─> Ticketmaster API  (eventos AR, classificationName=music)
-            ├─> Firecrawl scrape Ticketek listing pages
-            └─> Firecrawl scrape Allaccess listing pages
-                     └─> UPSERT en tabla `concerts` (dedupe por source + external_id)
+Usuario clickea "Comprar" 
+   └─> POST /api/public/hooks/track-click  (fire-and-forget)
+            └─> INSERT en concert_clicks (concert_id, source, clicked_at, user_agent)
+   └─> window.open(buyUrl)  (abre Ticketmaster/etc)
 ```
 
-El mapa y el sidebar leen de la tabla `concerts` vía un server function público (lectura anónima con policy `TO anon SELECT`), nada cambia en la UI salvo el origen de los datos.
+## Cambios
 
-## Pasos de implementación
+1. **Migración**: tabla `public.concert_clicks`
+   - `id`, `concert_id` (FK → concerts), `source`, `buy_url`, `clicked_at`, `user_agent`, `referrer`
+   - RLS: `INSERT TO anon` permitido (cualquiera puede registrar un clic), `SELECT` solo para admins
+   - GRANTs correspondientes
 
-1. **Migración DB**: tabla `public.concerts` con campos:
-   - `id`, `source` (`'ticketmaster' | 'ticketek' | 'allaccess'`), `external_id`, `title`, `artist`, `venue`, `date`, `time`, `price`, `description`, `image_url`, `lat`, `lng`, `buy_url`, `last_seen_at`, `created_at`, `updated_at`
-   - UNIQUE(`source`, `external_id`) para upsert
-   - RLS + `GRANT SELECT TO anon` (lectura pública), escritura solo `service_role`
+2. **Endpoint público** `src/routes/api/public/hooks/track-click.ts`
+   - POST con `{ concertId }`, inserta la fila usando service role
+   - Responde 200 rápido (no bloquea la navegación)
 
-2. **Server route** `src/routes/api/public/hooks/ingest-concerts.ts`:
-   - Auth con `apikey` header (anon key, patrón estándar de cron)
-   - Llama Ticketmaster: `GET https://app.ticketmaster.com/discovery/v2/events.json?countryCode=AR&classificationName=Music&apikey=...`
-   - Llama Firecrawl scrape con formato `json` + schema para Ticketek/Allaccess
-   - Geocoding de venues (Ticketmaster ya devuelve lat/lng; para los otros uso Nominatim gratis o dejo coords del venue mapeadas a mano)
-   - UPSERT con `supabaseAdmin` (cargado dentro del handler)
-   - Devuelve `{ inserted, updated, errors }`
+3. **`ConcertDetails.tsx`**: el botón pasa de `<a href>` a un `onClick` que:
+   - Dispara `fetch('/api/public/hooks/track-click', ...)` con `keepalive: true`
+   - Abre `buyUrl` en nueva pestaña
 
-3. **Server function pública** `src/lib/concerts.functions.ts`:
-   - `listConcerts()` con server publishable client → SELECT de la tabla
-   - Reemplaza el import de `src/data/concerts.ts` en `src/routes/index.tsx`
+4. **Página admin** `/admin/stats` (protegida bajo `_authenticated` + check de rol admin):
+   - Server function `getClickStats()` que hace un `GROUP BY concert_id` con joins a `concerts`
+   - Tabla con: título, venue, fecha, total de clics, último clic
+   - Opcional: filtro por rango de fechas
 
-4. **Cron job** (vía `supabase--insert`):
-   - `cron.schedule('ingest-concerts', '0 */6 * * *', net.http_post(...))` cada 6 horas
+5. **Rol admin**: si todavía no existe el sistema de roles (`user_roles` + `has_role`), lo agrego en la misma migración y te dejo a vos como admin (necesito que me pases tu user id o lo marco al primer usuario registrado).
 
-5. **Página admin opcional** `/admin/ingest` con botón "Run now" para disparar la ingesta manual mientras testeás (protegida por `_authenticated` + rol admin).
+## Lo que NO incluye
 
-## Detalles técnicos
+- Tracking de vistas del concierto (sólo clics al botón de compra). Si querés también "cuántos abrieron el detalle", lo agregamos después.
+- Analytics avanzados (conversiones reales, tiempo en página, geo). Para eso conviene Plausible/PostHog más adelante.
+- Dashboard con gráficos — empieza como tabla simple, si querés gráficos los sumamos.
 
-- **Ticketmaster**: Discovery API v2, free tier 5000 req/día, devuelve JSON estructurado con venue.location.{latitude,longitude}, imágenes, fechas ISO, link a compra. Mapeo directo.
-- **Ticketek/Allaccess**: Firecrawl con `formats: [{ type: 'json', schema: z.object({ events: z.array(...) }) }]` para extracción estructurada por LLM. Más frágil — si cambian el HTML hay que ajustar el prompt.
-- **Dedupe**: si el mismo concierto aparece en dos sources, quedan como dos rows (distinto `source`). Si querés merge, lo agregamos después con un campo `canonical_id`.
-- **Datos viejos**: los eventos con `date < today` se ocultan en la query del front; opcional purgar con otro cron.
+## Preguntas antes de implementar
 
-## Lo que NO incluye este plan
-
-- Filtrado por ciudad (ahora trae todo AR; si querés solo Buenos Aires lo filtro en la query).
-- Notificaciones de eventos nuevos.
-- Reviews / ratings / favoritos por usuario.
-
-¿Le damos así, o ajustamos algo (frecuencia del cron, sources, ciudades)?
+- ¿Te alcanza con un total de clics por concierto, o querés ver también clics por día / por fuente (Ticketmaster vs Ticketek vs Allaccess)?
+- ¿Ya tenés cuenta creada en la app? Si sí, decime el email y te marco como admin en la migración. Si no, lo dejo configurable después.
