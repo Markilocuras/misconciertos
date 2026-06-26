@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { ConcertMap } from "@/components/ConcertMap";
 import { ConcertDetails } from "@/components/ConcertDetails";
 import { DateFilter } from "@/components/DateFilter";
-import { concerts as allConcerts, type Concert } from "@/data/concerts";
+import { type Concert } from "@/data/concerts";
+import { listConcerts } from "@/lib/concerts.functions";
 import { Music2 } from "lucide-react";
 import { AuthMenu } from "@/components/AuthMenu";
 
@@ -30,13 +32,46 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const fetchConcerts = useServerFn(listConcerts);
+  const [allConcerts, setAllConcerts] = useState<Concert[]>([]);
+  const [loading, setLoading] = useState(true);
   const [date, setDate] = useState<string>("");
   const [selected, setSelected] = useState<Concert | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchConcerts()
+      .then((res) => {
+        if (cancelled) return;
+        const mapped: Concert[] = (res.concerts ?? [])
+          .filter((c) => c.lat != null && c.lng != null && c.date != null)
+          .map((c) => ({
+            id: c.id,
+            title: c.title,
+            artist: c.artist ?? "",
+            venue: c.venue ?? "",
+            date: c.date as string,
+            time: c.time ?? "",
+            price: c.price ?? "",
+            description: c.description ?? "",
+            image: c.image_url ?? "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800",
+            lat: c.lat as number,
+            lng: c.lng as number,
+            buyUrl: c.buy_url ?? "#",
+          }));
+        setAllConcerts(mapped);
+      })
+      .catch((err) => console.error("[index] failed to load concerts", err))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [fetchConcerts]);
 
   const filtered = useMemo(() => {
     if (!date) return allConcerts;
     return allConcerts.filter((c) => c.date >= date);
-  }, [date]);
+  }, [date, allConcerts]);
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
@@ -54,6 +89,10 @@ function Index() {
             <Music2 className="h-4 w-4 text-primary" />
           </div>
           <h1 className="text-sm font-semibold tracking-tight">Conciertos BA</h1>
+          {loading && <span className="text-xs text-muted-foreground">cargando…</span>}
+          {!loading && allConcerts.length === 0 && (
+            <span className="text-xs text-muted-foreground">sin datos — corré la ingesta</span>
+          )}
         </div>
         <div className="pointer-events-auto flex items-center gap-3 md:ml-auto">
           <DateFilter value={date} onChange={setDate} count={filtered.length} />
