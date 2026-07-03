@@ -5,6 +5,17 @@ import { getClickStats, type ClickStat } from "@/lib/stats.functions";
 import { ArrowLeft, BarChart3 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/stats")({
+  head: () => ({
+    meta: [
+      { title: "Estadísticas de clics — Conciertos BA" },
+      {
+        name: "description",
+        content:
+          "Panel interno de Conciertos BA con las estadísticas de clics en 'Comprar entradas' por concierto.",
+      },
+      { name: "robots", content: "noindex, nofollow" },
+    ],
+  }),
   component: StatsPage,
 });
 
