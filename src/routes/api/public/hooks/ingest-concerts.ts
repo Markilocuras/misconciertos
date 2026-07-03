@@ -73,6 +73,18 @@ function normalizeDate(input: string | null | undefined): string | null {
   return null;
 }
 
+function safeHttpUrl(input: string | null | undefined): string | null {
+  if (!input) return null;
+  const trimmed = input.trim();
+  try {
+    const u = new URL(trimmed);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 function makeExternalId(source: string, ev: ScrapedEvent): string {
   if (ev.buy_url) return ev.buy_url;
   return `${source}:${ev.title}:${ev.date ?? ""}:${ev.venue ?? ""}`.slice(0, 200);
