@@ -1,47 +1,45 @@
-# Plan: trackear clics en "Comprar entradas"
+## Objetivo
 
-Sí, se puede — pero hay que agregarlo, hoy el botón es un `<a href>` directo a Ticketmaster/Ticketek/Allaccess y no queda registro de nada.
-
-## Cómo lo resolvemos
-
-Cada vez que un usuario clickea "Comprar entradas" en `ConcertDetails.tsx`, guardamos una fila en una tabla nueva `concert_clicks` antes de mandarlo al sitio externo. Después tenés una página simple `/admin/stats` donde ves cuántos clics tuvo cada concierto.
-
-```
-Usuario clickea "Comprar" 
-   └─> POST /api/public/hooks/track-click  (fire-and-forget)
-            └─> INSERT en concert_clicks (concert_id, source, clicked_at, user_agent)
-   └─> window.open(buyUrl)  (abre Ticketmaster/etc)
-```
+Activar la ingesta automática de conciertos con Firecrawl, espaciada para gastar menos créditos, y limpiar los datos seed para que sólo queden los reales scrapeados.
 
 ## Cambios
 
-1. **Migración**: tabla `public.concert_clicks`
-   - `id`, `concert_id` (FK → concerts), `source`, `buy_url`, `clicked_at`, `user_agent`, `referrer`
-   - RLS: `INSERT TO anon` permitido (cualquiera puede registrar un clic), `SELECT` solo para admins
-   - GRANTs correspondientes
+### 1. Borrar los 6 conciertos seed
+`DELETE FROM public.concerts WHERE source = 'seed';`
 
-2. **Endpoint público** `src/routes/api/public/hooks/track-click.ts`
-   - POST con `{ concertId }`, inserta la fila usando service role
-   - Responde 200 rápido (no bloquea la navegación)
+Se ejecuta antes de activar el cron para que el mapa quede vacío hasta la primera corrida real. Si preferís mantenerlos hasta que scrapee al menos una vez, decime y lo dejamos para después.
 
-3. **`ConcertDetails.tsx`**: el botón pasa de `<a href>` a un `onClick` que:
-   - Dispara `fetch('/api/public/hooks/track-click', ...)` con `keepalive: true`
-   - Abre `buyUrl` en nueva pestaña
+### 2. Programar cron `pg_cron` cada 12 horas
+Job que llama a `POST https://project--d6e08755-1efd-4cef-b0e2-632923d03f02.lovable.app/api/public/hooks/ingest-concerts` cada 12 h (a las 6:00 y 18:00 UTC → 3:00 y 15:00 hora Argentina).
 
-4. **Página admin** `/admin/stats` (protegida bajo `_authenticated` + check de rol admin):
-   - Server function `getClickStats()` que hace un `GROUP BY concert_id` con joins a `concerts`
-   - Tabla con: título, venue, fecha, total de clics, último clic
-   - Opcional: filtro por rango de fechas
+```sql
+SELECT cron.schedule(
+  'ingest-concerts-twice-daily',
+  '0 6,18 * * *',
+  $$
+  SELECT net.http_post(
+    url := 'https://project--d6e08755-1efd-4cef-b0e2-632923d03f02.lovable.app/api/public/hooks/ingest-concerts',
+    headers := '{"Content-Type":"application/json","apikey":"<ANON_KEY>"}'::jsonb,
+    body := '{}'::jsonb
+  );
+  $$
+);
+```
 
-5. **Rol admin**: si todavía no existe el sistema de roles (`user_roles` + `has_role`), lo agrego en la misma migración y te dejo a vos como admin (necesito que me pases tu user id o lo marco al primer usuario registrado).
+Consumo estimado: 3 URLs × 2 corridas/día ≈ **6 créditos Firecrawl/día** (~180/mes).
 
-## Lo que NO incluye
+### 3. Habilitar extensiones (si no están ya)
+`CREATE EXTENSION IF NOT EXISTS pg_cron;` y `CREATE EXTENSION IF NOT EXISTS pg_net;`
 
-- Tracking de vistas del concierto (sólo clics al botón de compra). Si querés también "cuántos abrieron el detalle", lo agregamos después.
-- Analytics avanzados (conversiones reales, tiempo en página, geo). Para eso conviene Plausible/PostHog más adelante.
-- Dashboard con gráficos — empieza como tabla simple, si querés gráficos los sumamos.
+## Pasos que hacés vos después
 
-## Preguntas antes de implementar
+1. Publicar la web (botón arriba a la derecha) — necesario para que la URL del cron funcione.
+2. Ir a `/auth` y crear tu cuenta → quedás como admin automáticamente.
+3. Esperar la primera corrida (o dispararla a mano desde acá si querés ver resultados ya).
+4. Revisar `/admin/stats` una vez que la gente empiece a clickear "Comprar entradas".
 
-- ¿Te alcanza con un total de clics por concierto, o querés ver también clics por día / por fuente (Ticketmaster vs Ticketek vs Allaccess)?
-- ¿Ya tenés cuenta creada en la app? Si sí, decime el email y te marco como admin en la migración. Si no, lo dejo configurable después.
+## Lo que NO hace este plan
+
+- No cambia frecuencia de scraping después (si querés más/menos, se ajusta con otro `cron.schedule`).
+- No agrega nuevas fuentes de scraping (siguen Ticketmaster/Ticketek/Allaccess).
+- No conecta dominio propio ni cambia visibilidad — eso se hace desde Project Settings cuando quieras.
