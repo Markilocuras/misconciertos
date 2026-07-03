@@ -89,7 +89,9 @@ function Index() {
           <div className="rounded-full bg-primary/15 p-1.5">
             <Music2 className="h-4 w-4 text-primary" />
           </div>
-          <h1 className="text-sm font-semibold tracking-tight">Conciertos BA</h1>
+          <h1 className="text-sm font-semibold tracking-tight">
+            Conciertos BA <span className="hidden text-muted-foreground sm:inline">— Mapa de recitales</span>
+          </h1>
           {loading && <span className="text-xs text-muted-foreground">cargando…</span>}
           {!loading && allConcerts.length === 0 && (
             <span className="text-xs text-muted-foreground">sin datos — corré la ingesta</span>
