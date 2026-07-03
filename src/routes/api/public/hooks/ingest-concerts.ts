@@ -94,20 +94,34 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        // Auth con secreto dedicado (no reutilizar la anon key, que es pública)
+        // Auth con secreto dedicado almacenado en public.cron_secrets (solo
+        // service_role puede leerlo). No reutilizamos la anon key, que es pública.
         const provided =
           request.headers.get("x-cron-secret") ??
           request.headers.get("Authorization")?.replace("Bearer ", "");
-        const expected = process.env.INGEST_CRON_SECRET;
-        if (!expected) {
+        if (!provided) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), {
+            status: 401,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { data: secretRow, error: secretErr } = await supabaseAdmin
+          .from("cron_secrets")
+          .select("value")
+          .eq("id", "ingest")
+          .maybeSingle();
+        if (secretErr || !secretRow?.value) {
           return new Response(JSON.stringify({ error: "Server not configured" }), {
             status: 500,
             headers: { "Content-Type": "application/json" },
           });
         }
-        const a = Buffer.from(provided ?? "");
-        const b = Buffer.from(expected);
+
         const { timingSafeEqual } = await import("crypto");
+        const a = Buffer.from(provided);
+        const b = Buffer.from(secretRow.value);
         if (a.length !== b.length || !timingSafeEqual(a, b)) {
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
