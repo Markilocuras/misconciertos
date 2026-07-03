@@ -149,10 +149,10 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
                   time: ev.time ?? null,
                   price: ev.price ?? null,
                   description: ev.description ?? null,
-                  image_url: ev.image_url ?? null,
+                  image_url: safeHttpUrl(ev.image_url),
                   lat: coords.lat,
                   lng: coords.lng,
-                  buy_url: ev.buy_url ?? null,
+                  buy_url: safeHttpUrl(ev.buy_url),
                   last_seen_at: new Date().toISOString(),
                 };
               })
