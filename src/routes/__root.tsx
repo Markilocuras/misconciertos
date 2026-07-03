@@ -89,6 +89,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "Mapa interactivo de conciertos en Buenos Aires. Filtrá por fecha y comprá entradas.",
       },
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Conciertos BA — Mapa de recitales en Buenos Aires" },
+      { name: "description", content: "Buenos Aires Concert Map is a web application for discovering and purchasing concert tickets in Buenos Aires." },
+      { property: "og:description", content: "Buenos Aires Concert Map is a web application for discovering and purchasing concert tickets in Buenos Aires." },
+      { name: "twitter:description", content: "Buenos Aires Concert Map is a web application for discovering and purchasing concert tickets in Buenos Aires." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b3025747-27e4-444c-a839-617308d2d36f/id-preview-cd69b375--d6e08755-1efd-4cef-b0e2-632923d03f02.lovable.app-1783096156945.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/b3025747-27e4-444c-a839-617308d2d36f/id-preview-cd69b375--d6e08755-1efd-4cef-b0e2-632923d03f02.lovable.app-1783096156945.png" },
     ],
     links: [
       {
