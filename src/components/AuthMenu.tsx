@@ -40,8 +40,11 @@ export function AuthMenu() {
           variant="ghost"
           className="h-7 px-2"
           onClick={() => supabase.auth.signOut()}
+          aria-label="Cerrar sesión"
+          title="Cerrar sesión"
         >
-          <LogOut className="h-3.5 w-3.5" />
+          <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="sr-only">Cerrar sesión</span>
         </Button>
       </div>
     );

@@ -14,7 +14,22 @@ export const Route = createFileRoute("/auth")({
     mode: (search.mode === "register" ? "register" : "login") as Mode,
   }),
   head: () => ({
-    meta: [{ title: "Acceder — Conciertos BA" }],
+    meta: [
+      { title: "Acceder — Conciertos BA" },
+      {
+        name: "description",
+        content:
+          "Iniciá sesión o creá tu cuenta en Conciertos BA para guardar recitales y comprar entradas en Buenos Aires.",
+      },
+      { property: "og:title", content: "Acceder — Conciertos BA" },
+      {
+        property: "og:description",
+        content: "Iniciá sesión o registrate en Conciertos BA.",
+      },
+      { property: "og:url", content: "https://misconciertos.lovable.app/auth" },
+      { name: "robots", content: "noindex, follow" },
+    ],
+    links: [{ rel: "canonical", href: "https://misconciertos.lovable.app/auth" }],
   }),
   component: AuthPage,
 });

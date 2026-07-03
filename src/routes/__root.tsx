@@ -74,19 +74,47 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
-      { name: "description", content: "Lovable Generated Project" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "Lovable App" },
-      { property: "og:description", content: "Lovable Generated Project" },
+      { title: "Conciertos BA — Mapa de recitales en Buenos Aires" },
+      {
+        name: "description",
+        content:
+          "Descubrí conciertos y recitales en Buenos Aires en un mapa interactivo. Filtrá por fecha y comprá entradas al instante.",
+      },
+      { property: "og:site_name", content: "Conciertos BA" },
       { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { property: "og:title", content: "Conciertos BA — Mapa de recitales en Buenos Aires" },
+      {
+        property: "og:description",
+        content:
+          "Mapa interactivo de conciertos en Buenos Aires. Filtrá por fecha y comprá entradas.",
+      },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
+      },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@graph": [
+            {
+              "@type": "Organization",
+              name: "Conciertos BA",
+              url: "https://misconciertos.lovable.app",
+            },
+            {
+              "@type": "WebSite",
+              name: "Conciertos BA",
+              url: "https://misconciertos.lovable.app",
+              inLanguage: "es-AR",
+            },
+          ],
+        }),
       },
     ],
   }),
@@ -98,7 +126,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="es-AR">
       <head>
         <HeadContent />
       </head>

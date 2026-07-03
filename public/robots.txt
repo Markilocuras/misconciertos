@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /auth
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://misconciertos.lovable.app/sitemap.xml

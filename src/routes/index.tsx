@@ -13,20 +13,21 @@ import { AuthMenu } from "@/components/AuthMenu";
 export const Route = createFileRoute("/")({
   ssr: false,
   head: () => ({
-
     meta: [
-      { title: "Mapa de Conciertos — Buenos Aires" },
+      { title: "Conciertos BA — Mapa de recitales en Buenos Aires" },
       {
         name: "description",
         content:
-          "Descubrí y comprá entradas para conciertos en Buenos Aires. Filtrá por fecha y encontralos en el mapa.",
+          "Descubrí y comprá entradas para conciertos en Buenos Aires. Filtrá por fecha y encontralos en un mapa interactivo.",
       },
-      { property: "og:title", content: "Mapa de Conciertos — Buenos Aires" },
+      { property: "og:title", content: "Conciertos BA — Mapa de recitales en Buenos Aires" },
       {
         property: "og:description",
         content: "Conciertos en Buenos Aires, en un mapa interactivo.",
       },
+      { property: "og:url", content: "https://misconciertos.lovable.app/" },
     ],
+    links: [{ rel: "canonical", href: "https://misconciertos.lovable.app/" }],
   }),
   component: Index,
 });
@@ -88,7 +89,9 @@ function Index() {
           <div className="rounded-full bg-primary/15 p-1.5">
             <Music2 className="h-4 w-4 text-primary" />
           </div>
-          <h1 className="text-sm font-semibold tracking-tight">Conciertos BA</h1>
+          <h1 className="text-sm font-semibold tracking-tight">
+            Conciertos BA <span className="hidden text-muted-foreground sm:inline">— Mapa de recitales</span>
+          </h1>
           {loading && <span className="text-xs text-muted-foreground">cargando…</span>}
           {!loading && allConcerts.length === 0 && (
             <span className="text-xs text-muted-foreground">sin datos — corré la ingesta</span>
