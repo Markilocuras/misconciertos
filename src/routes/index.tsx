@@ -13,20 +13,21 @@ import { AuthMenu } from "@/components/AuthMenu";
 export const Route = createFileRoute("/")({
   ssr: false,
   head: () => ({
-
     meta: [
-      { title: "Mapa de Conciertos — Buenos Aires" },
+      { title: "Conciertos BA — Mapa de recitales en Buenos Aires" },
       {
         name: "description",
         content:
-          "Descubrí y comprá entradas para conciertos en Buenos Aires. Filtrá por fecha y encontralos en el mapa.",
+          "Descubrí y comprá entradas para conciertos en Buenos Aires. Filtrá por fecha y encontralos en un mapa interactivo.",
       },
-      { property: "og:title", content: "Mapa de Conciertos — Buenos Aires" },
+      { property: "og:title", content: "Conciertos BA — Mapa de recitales en Buenos Aires" },
       {
         property: "og:description",
         content: "Conciertos en Buenos Aires, en un mapa interactivo.",
       },
+      { property: "og:url", content: "https://misconciertos.lovable.app/" },
     ],
+    links: [{ rel: "canonical", href: "https://misconciertos.lovable.app/" }],
   }),
   component: Index,
 });
