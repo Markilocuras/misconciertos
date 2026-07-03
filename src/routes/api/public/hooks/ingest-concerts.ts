@@ -137,7 +137,6 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
         }
 
         const firecrawl = new Firecrawl({ apiKey: process.env.FIRECRAWL_API_KEY });
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const results: Record<string, { scraped: number; upserted: number; error?: string }> = {};
 
