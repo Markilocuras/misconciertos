@@ -82,9 +82,21 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        // Auth con anon key (patrón estándar pg_cron)
-        const apiKey = request.headers.get("apikey") ?? request.headers.get("Authorization")?.replace("Bearer ", "");
-        if (!apiKey || apiKey !== process.env.SUPABASE_PUBLISHABLE_KEY) {
+        // Auth con secreto dedicado (no reutilizar la anon key, que es pública)
+        const provided =
+          request.headers.get("x-cron-secret") ??
+          request.headers.get("Authorization")?.replace("Bearer ", "");
+        const expected = process.env.INGEST_CRON_SECRET;
+        if (!expected) {
+          return new Response(JSON.stringify({ error: "Server not configured" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        const a = Buffer.from(provided ?? "");
+        const b = Buffer.from(expected);
+        const { timingSafeEqual } = await import("crypto");
+        if (a.length !== b.length || !timingSafeEqual(a, b)) {
           return new Response(JSON.stringify({ error: "Unauthorized" }), {
             status: 401,
             headers: { "Content-Type": "application/json" },
