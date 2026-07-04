@@ -3,10 +3,12 @@ import Firecrawl from "@mendable/firecrawl-js";
 import { z } from "zod";
 
 // Listings que vamos a scrapear. Podés agregar/quitar URLs acá.
-const SOURCES: Array<{ source: string; url: string }> = [
-  { source: "ticketmaster", url: "https://www.ticketmaster.com.ar/category/57693/musica" },
-  { source: "ticketek", url: "https://www.ticketek.com.ar/" },
-  { source: "allaccess", url: "https://www.allaccess.com.ar/event" },
+// Songkick tiene HTML limpio y agrega shows de varios venues.
+// Movistar Arena y Luna Park son los venues grandes con listados propios.
+const SOURCES: Array<{ source: string; url: string; waitFor?: number }> = [
+  { source: "songkick", url: "https://www.songkick.com/metro-areas/32109-argentina-buenos-aires" },
+  { source: "movistar-arena", url: "https://www.movistararena.com.ar/eventos/", waitFor: 3000 },
+  { source: "luna-park", url: "https://www.lunapark.com.ar/", waitFor: 3000 },
 ];
 
 // Coordenadas conocidas de venues comunes en Buenos Aires.
