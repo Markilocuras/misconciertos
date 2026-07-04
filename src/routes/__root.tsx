@@ -74,22 +74,22 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Conciertos BA — Mapa de recitales en Buenos Aires" },
+      { title: "misconciertos — Mapa de recitales en Buenos Aires" },
       {
         name: "description",
         content:
           "Descubrí conciertos y recitales en Buenos Aires en un mapa interactivo. Filtrá por fecha y comprá entradas al instante.",
       },
-      { property: "og:site_name", content: "Conciertos BA" },
+      { property: "og:site_name", content: "misconciertos" },
       { property: "og:type", content: "website" },
-      { property: "og:title", content: "Conciertos BA — Mapa de recitales en Buenos Aires" },
+      { property: "og:title", content: "misconciertos — Mapa de recitales en Buenos Aires" },
       {
         property: "og:description",
         content:
           "Mapa interactivo de conciertos en Buenos Aires. Filtrá por fecha y comprá entradas.",
       },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Conciertos BA — Mapa de recitales en Buenos Aires" },
+      { name: "twitter:title", content: "misconciertos — Mapa de recitales en Buenos Aires" },
       { name: "description", content: "Buenos Aires Concert Map is a web application for discovering and purchasing concert tickets in Buenos Aires." },
       { property: "og:description", content: "Buenos Aires Concert Map is a web application for discovering and purchasing concert tickets in Buenos Aires." },
       { name: "twitter:description", content: "Buenos Aires Concert Map is a web application for discovering and purchasing concert tickets in Buenos Aires." },
@@ -110,12 +110,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "@graph": [
             {
               "@type": "Organization",
-              name: "Conciertos BA",
+              name: "misconciertos",
               url: "https://misconciertos.lovable.app",
             },
             {
               "@type": "WebSite",
-              name: "Conciertos BA",
+              name: "misconciertos",
               url: "https://misconciertos.lovable.app",
               inLanguage: "es-AR",
             },

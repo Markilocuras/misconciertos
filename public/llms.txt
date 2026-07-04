@@ -1,8 +1,8 @@
-# Conciertos BA
+# misconciertos
 
 > Mapa interactivo de conciertos y recitales en Buenos Aires. Filtrá por fecha y comprá entradas.
 
-Conciertos BA reúne los próximos recitales en Buenos Aires en un mapa interactivo. Cada punto del mapa es un concierto con su venue, fecha, hora, precio desde y enlace directo a la página oficial de venta de entradas.
+misconciertos reúne los próximos recitales en Buenos Aires en un mapa interactivo. Cada punto del mapa es un concierto con su venue, fecha, hora, precio desde y enlace directo a la página oficial de venta de entradas.
 
 ## Pages
 
