@@ -142,7 +142,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
 
         const results: Record<string, { scraped: number; upserted: number; error?: string }> = {};
 
-        for (const { source, url } of SOURCES) {
+        for (const { source, url, waitFor } of SOURCES) {
           try {
             const scrape = await firecrawl.scrape(url, {
               formats: [
@@ -150,10 +150,12 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
                   type: "json",
                   schema: eventSchema,
                   prompt:
-                    "Extraé todos los conciertos/eventos musicales listados en esta página. Incluí nombre, artista, lugar, fecha, hora, precio y URL para comprar entradas. Si la fecha está en español (ej '15 de mayo'), convertila a YYYY-MM-DD asumiendo el próximo año disponible.",
+                    "Extraé todos los conciertos/eventos musicales listados en esta página. Incluí nombre del show, artista principal, nombre del venue/lugar, fecha (en formato YYYY-MM-DD; si sólo hay día y mes en español asumí el próximo año en el que ocurre), hora, precio, URL absoluta de la imagen y URL absoluta para comprar entradas. Ignorá items que no sean eventos musicales.",
                 },
               ],
               onlyMainContent: true,
+              ...(waitFor ? { waitFor } : {}),
+              location: { country: "AR", languages: ["es"] },
             });
 
             // SDK v2 returns result.json on the result object, but normalize defensively
