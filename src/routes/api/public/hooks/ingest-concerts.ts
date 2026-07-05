@@ -238,8 +238,7 @@ function parseEventsFromMarkdown(markdown: string, baseUrl: string): ScrapedEven
   }
   if (current?.length) segments.push(current);
 
-  return segments
-    .map((segment) => {
+  const parsed: Array<ScrapedEvent | null> = segments.map((segment) => {
       const { date, time } = parseDateAndTime(segment[0]);
       const linkIndex = segment.findIndex((line) => /\[[^\]]+\]\((https?:\/\/[^)\s]+|\/[^)\s]+)(?:\s+"[^"]*")?\)/.test(line));
       if (linkIndex < 0) return null;
@@ -265,8 +264,9 @@ function parseEventsFromMarkdown(markdown: string, baseUrl: string): ScrapedEven
         image_url: null,
         buy_url: buyUrl,
       } satisfies ScrapedEvent;
-    })
-    .filter((event): event is ScrapedEvent => Boolean(event?.title && event.date && event.buy_url));
+    });
+
+  return parsed.filter((event): event is ScrapedEvent => Boolean(event?.title && event.date && event.buy_url));
 }
 
 function makeExternalId(source: string, ev: ScrapedEvent): string {
