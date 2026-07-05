@@ -4,10 +4,9 @@ import { z } from "zod";
 
 // Listings que vamos a scrapear. Podés agregar/quitar URLs acá.
 // Elegimos agregadores con HTML server-side (funcionan bien con Firecrawl).
-const SOURCES: Array<{ source: string; url: string; waitFor?: number }> = [
-  { source: "allevents-music", url: "https://allevents.in/buenos%20aires/music" },
-  { source: "allevents-concerts", url: "https://allevents.in/buenos%20aires/concerts" },
-  { source: "songkick", url: "https://www.songkick.com/metro-areas/32109-argentina-buenos-aires", waitFor: 2000 },
+const SOURCES: Array<{ key: string; source: string; url: string; waitFor?: number }> = [
+  { key: "allevents-concerts", source: "allevents", url: "https://allevents.in/buenos-aires/concerts" },
+  { key: "allevents-music", source: "allevents", url: "https://allevents.in/buenos-aires/music" },
 ];
 
 // Coordenadas conocidas de venues comunes en Buenos Aires.
@@ -36,6 +35,19 @@ const VENUE_COORDS: Record<string, { lat: number; lng: number }> = {
   "monumental": { lat: -34.5453, lng: -58.4498 },
   "la trastienda": { lat: -34.6189, lng: -58.3705 },
   "groove": { lat: -34.5867, lng: -58.4259 },
+  "parque sarmiento": { lat: -34.5548, lng: -58.4936 },
+  "estadio malvinas argentinas": { lat: -34.6026, lng: -58.4592 },
+  "microestadio malvinas": { lat: -34.6026, lng: -58.4592 },
+  "teatro colón": { lat: -34.6011, lng: -58.3832 },
+  "teatro colon": { lat: -34.6011, lng: -58.3832 },
+  "centro galicia": { lat: -34.6095, lng: -58.4128 },
+  "palacio alsina": { lat: -34.6101, lng: -58.3737 },
+  "costa 21": { lat: -34.5444, lng: -58.4383 },
+  "teatro flores": { lat: -34.6284, lng: -58.4635 },
+  "estadio velez": { lat: -34.6356, lng: -58.5203 },
+  "vélez": { lat: -34.6356, lng: -58.5203 },
+  "estadio geba": { lat: -34.5694, lng: -58.4225 },
+  "geba": { lat: -34.5694, lng: -58.4225 },
 };
 
 function findVenueCoords(venue: string | null | undefined): { lat: number | null; lng: number | null } {
@@ -65,6 +77,82 @@ const eventSchema = z.object({
 
 type ScrapedEvent = z.infer<typeof eventSchema>["events"][number];
 
+const MONTHS: Record<string, number> = {
+  jan: 1,
+  january: 1,
+  ene: 1,
+  enero: 1,
+  feb: 2,
+  february: 2,
+  febrero: 2,
+  mar: 3,
+  march: 3,
+  marzo: 3,
+  apr: 4,
+  april: 4,
+  abr: 4,
+  abril: 4,
+  may: 5,
+  mayo: 5,
+  jun: 6,
+  june: 6,
+  junio: 6,
+  jul: 7,
+  july: 7,
+  julio: 7,
+  aug: 8,
+  august: 8,
+  ago: 8,
+  agosto: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  septiembre: 9,
+  oct: 10,
+  october: 10,
+  octubre: 10,
+  nov: 11,
+  november: 11,
+  noviembre: 11,
+  dec: 12,
+  december: 12,
+  dic: 12,
+  diciembre: 12,
+};
+
+function toIsoDate(year: number, month: number, day: number): string {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function parseDateAndTime(input: string): { date: string | null; time: string | null } {
+  const normalized = input.replace(/^[-*]\s*/, "").replace(/\s+\+\s+\d+\s+more/i, "").trim();
+  const explicit = normalized.match(
+    /(?:mon|tue|wed|thu|fri|sat|sun|lun|mar|mi[eé]|jue|vie|s[aá]b|dom)?\s*,?\s*(\d{1,2})\s+([a-záéíóúñ]+)\s*,?\s*(\d{4})?\s*(?:[-•]|a las)?\s*(\d{1,2}):(\d{2})\s*(am|pm)?/i,
+  );
+  if (!explicit) return { date: normalizeDate(input), time: null };
+
+  const day = Number(explicit[1]);
+  const month = MONTHS[explicit[2].toLowerCase()];
+  if (!month || !day) return { date: normalizeDate(input), time: null };
+
+  const now = new Date();
+  let year = explicit[3] ? Number(explicit[3]) : now.getFullYear();
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  if (!explicit[3] && candidate < today) year += 1;
+
+  let hour = Number(explicit[4]);
+  const minute = Number(explicit[5]);
+  const meridiem = explicit[6]?.toLowerCase();
+  if (meridiem === "pm" && hour < 12) hour += 12;
+  if (meridiem === "am" && hour === 12) hour = 0;
+
+  return {
+    date: toIsoDate(year, month, day),
+    time: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
+  };
+}
+
 function normalizeDate(input: string | null | undefined): string | null {
   if (!input) return null;
   const iso = input.match(/(\d{4})-(\d{2})-(\d{2})/);
@@ -84,6 +172,101 @@ function safeHttpUrl(input: string | null | undefined): string | null {
   } catch {
     return null;
   }
+}
+
+function absolutizeUrl(input: string | null | undefined, baseUrl: string): string | null {
+  if (!input) return null;
+  try {
+    return safeHttpUrl(new URL(input, baseUrl).toString());
+  } catch {
+    return safeHttpUrl(input);
+  }
+}
+
+function stripMarkdown(input: string): string {
+  return input
+    .replace(/\*\*/g, "")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function looksLikeDateLine(line: string): boolean {
+  return /(?:mon|tue|wed|thu|fri|sat|sun|lun|mar|mi[eé]|jue|vie|s[aá]b|dom)\s*,?\s*\d{1,2}\s+[a-záéíóúñ]+/i.test(line);
+}
+
+function looksLikeNoise(line: string): boolean {
+  return (
+    /^!\[/.test(line) ||
+    /^\|$/.test(line) ||
+    /interested/i.test(line) ||
+    /^(share|open app|sign in|create event|get updates|added to interests)$/i.test(line) ||
+    /^\[.*\]\(#\)$/.test(line)
+  );
+}
+
+function extractPrice(lines: string[]): string | null {
+  const found = lines.find((line) => /\b(ARS|EUR|USD|free|gratis|\$)\b/i.test(line) && line.length <= 80);
+  return found ? stripMarkdown(found.replace(/^[-*]\s*/, "")) : null;
+}
+
+function deriveArtist(title: string): string | null {
+  const separators = [" • ", " - ", " en ", " in "];
+  for (const separator of separators) {
+    const [first] = title.split(separator);
+    if (first && first.length >= 2 && first.length < title.length) return first.trim();
+  }
+  return title;
+}
+
+function parseEventsFromMarkdown(markdown: string, baseUrl: string): ScrapedEvent[] {
+  const lines = markdown
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  const segments: string[][] = [];
+  let current: string[] | null = null;
+  for (const line of lines) {
+    if (looksLikeDateLine(line)) {
+      if (current?.length) segments.push(current);
+      current = [line];
+      continue;
+    }
+    if (current) current.push(line);
+  }
+  if (current?.length) segments.push(current);
+
+  return segments
+    .map((segment) => {
+      const { date, time } = parseDateAndTime(segment[0]);
+      const linkIndex = segment.findIndex((line) => /\[[^\]]+\]\((https?:\/\/[^)\s]+|\/[^)\s]+)(?:\s+"[^"]*")?\)/.test(line));
+      if (linkIndex < 0) return null;
+
+      const linkLine = segment[linkIndex];
+      const link = linkLine.match(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]+)(?:\s+"[^"]*")?\)/);
+      if (!link) return null;
+
+      const title = stripMarkdown(link[1]);
+      const buyUrl = absolutizeUrl(link[2], baseUrl);
+      const afterLink = segment.slice(linkIndex + 1).filter((line) => !looksLikeNoise(line));
+      const price = extractPrice(afterLink);
+      const venue = afterLink.find((line) => line !== price && !/\b(ARS|EUR|USD|free|gratis|\$)\b/i.test(line) && line.length <= 90);
+
+      return {
+        title,
+        artist: deriveArtist(title),
+        venue: venue ? stripMarkdown(venue) : null,
+        date,
+        time,
+        price,
+        description: venue ? `Concierto en ${stripMarkdown(venue)}.` : null,
+        image_url: null,
+        buy_url: buyUrl,
+      } satisfies ScrapedEvent;
+    })
+    .filter((event): event is ScrapedEvent => Boolean(event?.title && event.date && event.buy_url));
 }
 
 function makeExternalId(source: string, ev: ScrapedEvent): string {
@@ -142,41 +325,32 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
         const url = new URL(request.url);
         const debug = url.searchParams.get("debug") === "1";
 
-        const results: Record<string, { scraped: number; upserted: number; error?: string; sample?: string }> = {};
+        const results: Record<
+          string,
+          { scraped: number; upserted: number; discarded: number; error?: string; sample?: string; parsedSample?: ScrapedEvent[] }
+        > = {};
 
-        for (const { source, url: sourceUrl, waitFor } of SOURCES) {
+        for (const { key, source, url: sourceUrl, waitFor } of SOURCES) {
           try {
             const scrape = await firecrawl.scrape(sourceUrl, {
-              formats: debug
-                ? ["markdown"]
-                : [
-                    {
-                      type: "json",
-                      schema: eventSchema,
-                      prompt:
-                        "Extraé todos los conciertos/eventos musicales listados en esta página. Incluí nombre del show, artista principal, nombre del venue/lugar, fecha (en formato YYYY-MM-DD; si sólo hay día y mes en español asumí el próximo año en el que ocurre), hora, precio, URL absoluta de la imagen y URL absoluta para comprar entradas. Ignorá items que no sean eventos musicales.",
-                    },
-                  ],
+              formats: ["markdown"],
               onlyMainContent: true,
               ...(waitFor ? { waitFor } : {}),
               location: { country: "AR", languages: ["es"] },
             });
 
+            const md =
+              (scrape as { markdown?: string }).markdown ??
+              (scrape as { data?: { markdown?: string } }).data?.markdown ??
+              "";
+            const events = parseEventsFromMarkdown(md, sourceUrl);
+
             if (debug) {
-              const md =
-                (scrape as { markdown?: string }).markdown ??
-                (scrape as { data?: { markdown?: string } }).data?.markdown ??
-                "";
-              results[source] = { scraped: 0, upserted: 0, sample: md.slice(0, 800) };
+              results[key] = { scraped: events.length, upserted: 0, discarded: 0, sample: md.slice(0, 800), parsedSample: events.slice(0, 5) };
               continue;
             }
 
-            // SDK v2 returns result.json on the result object, but normalize defensively
-            const json =
-              (scrape as { json?: { events?: ScrapedEvent[] } }).json ??
-              (scrape as { data?: { json?: { events?: ScrapedEvent[] } } }).data?.json;
-            const events = json?.events ?? [];
-
+            const today = new Date().toISOString().slice(0, 10);
             const rows = events
               .map((ev) => {
                 const date = normalizeDate(ev.date);
@@ -198,7 +372,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
                   last_seen_at: new Date().toISOString(),
                 };
               })
-              .filter((r) => r.title && r.title.length > 0);
+              .filter((r) => r.title && r.title.length > 0 && r.date && r.date >= today && r.lat != null && r.lng != null);
 
             if (rows.length > 0) {
               const { error } = await supabaseAdmin
@@ -207,10 +381,10 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
               if (error) throw error;
             }
 
-            results[source] = { scraped: events.length, upserted: rows.length };
+            results[key] = { scraped: events.length, upserted: rows.length, discarded: events.length - rows.length };
           } catch (err) {
-            console.error(`[ingest-concerts] ${source} failed`, err);
-            results[source] = { scraped: 0, upserted: 0, error: err instanceof Error ? err.message : String(err) };
+            console.error(`[ingest-concerts] ${key} failed`, err);
+            results[key] = { scraped: 0, upserted: 0, discarded: 0, error: err instanceof Error ? err.message : String(err) };
           }
         }
 
