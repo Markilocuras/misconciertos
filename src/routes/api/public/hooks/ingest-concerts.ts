@@ -3,12 +3,11 @@ import Firecrawl from "@mendable/firecrawl-js";
 import { z } from "zod";
 
 // Listings que vamos a scrapear. Podés agregar/quitar URLs acá.
-// Songkick tiene HTML limpio y agrega shows de varios venues.
-// Movistar Arena y Luna Park son los venues grandes con listados propios.
+// Elegimos agregadores con HTML server-side (funcionan bien con Firecrawl).
 const SOURCES: Array<{ source: string; url: string; waitFor?: number }> = [
-  { source: "songkick", url: "https://www.songkick.com/metro-areas/32109-argentina-buenos-aires" },
-  { source: "movistar-arena", url: "https://www.movistararena.com.ar/eventos/", waitFor: 3000 },
-  { source: "luna-park", url: "https://www.lunapark.com.ar/", waitFor: 3000 },
+  { source: "allevents-music", url: "https://allevents.in/buenos%20aires/music" },
+  { source: "allevents-concerts", url: "https://allevents.in/buenos%20aires/concerts" },
+  { source: "songkick", url: "https://www.songkick.com/metro-areas/32109-argentina-buenos-aires", waitFor: 2000 },
 ];
 
 // Coordenadas conocidas de venues comunes en Buenos Aires.
@@ -140,23 +139,37 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
 
         const firecrawl = new Firecrawl({ apiKey: process.env.FIRECRAWL_API_KEY });
 
-        const results: Record<string, { scraped: number; upserted: number; error?: string }> = {};
+        const url = new URL(request.url);
+        const debug = url.searchParams.get("debug") === "1";
 
-        for (const { source, url, waitFor } of SOURCES) {
+        const results: Record<string, { scraped: number; upserted: number; error?: string; sample?: string }> = {};
+
+        for (const { source, url: sourceUrl, waitFor } of SOURCES) {
           try {
-            const scrape = await firecrawl.scrape(url, {
-              formats: [
-                {
-                  type: "json",
-                  schema: eventSchema,
-                  prompt:
-                    "Extraé todos los conciertos/eventos musicales listados en esta página. Incluí nombre del show, artista principal, nombre del venue/lugar, fecha (en formato YYYY-MM-DD; si sólo hay día y mes en español asumí el próximo año en el que ocurre), hora, precio, URL absoluta de la imagen y URL absoluta para comprar entradas. Ignorá items que no sean eventos musicales.",
-                },
-              ],
+            const scrape = await firecrawl.scrape(sourceUrl, {
+              formats: debug
+                ? ["markdown"]
+                : [
+                    {
+                      type: "json",
+                      schema: eventSchema,
+                      prompt:
+                        "Extraé todos los conciertos/eventos musicales listados en esta página. Incluí nombre del show, artista principal, nombre del venue/lugar, fecha (en formato YYYY-MM-DD; si sólo hay día y mes en español asumí el próximo año en el que ocurre), hora, precio, URL absoluta de la imagen y URL absoluta para comprar entradas. Ignorá items que no sean eventos musicales.",
+                    },
+                  ],
               onlyMainContent: true,
               ...(waitFor ? { waitFor } : {}),
               location: { country: "AR", languages: ["es"] },
             });
+
+            if (debug) {
+              const md =
+                (scrape as { markdown?: string }).markdown ??
+                (scrape as { data?: { markdown?: string } }).data?.markdown ??
+                "";
+              results[source] = { scraped: 0, upserted: 0, sample: md.slice(0, 800) };
+              continue;
+            }
 
             // SDK v2 returns result.json on the result object, but normalize defensively
             const json =
