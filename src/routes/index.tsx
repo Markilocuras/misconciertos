@@ -59,6 +59,7 @@ function Index() {
             lat: c.lat as number,
             lng: c.lng as number,
             buyUrl: c.buy_url ?? "#",
+            source: c.source,
           }));
         setAllConcerts(mapped);
       })
@@ -73,6 +74,8 @@ function Index() {
     if (!date) return allConcerts;
     return allConcerts.filter((c) => c.date >= date);
   }, [date, allConcerts]);
+
+  const realCount = useMemo(() => allConcerts.filter((c) => c.source !== "seed").length, [allConcerts]);
 
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
@@ -94,7 +97,13 @@ function Index() {
           </h1>
           {loading && <span className="text-xs text-muted-foreground">cargando…</span>}
           {!loading && allConcerts.length === 0 && (
-            <span className="text-xs text-muted-foreground">sin datos — corré la ingesta</span>
+            <span className="text-xs text-muted-foreground">sin conciertos disponibles</span>
+          )}
+          {!loading && allConcerts.length > 0 && realCount === 0 && (
+            <span className="text-xs text-muted-foreground">datos de prueba</span>
+          )}
+          {!loading && realCount > 0 && (
+            <span className="text-xs text-muted-foreground">{realCount} reales</span>
           )}
         </div>
         <div className="pointer-events-auto flex items-center gap-3 md:ml-auto">
