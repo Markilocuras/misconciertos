@@ -44,6 +44,9 @@ export function ConcertDetails({ concert, onClose }: Props) {
         <div>
           <p className="text-xs uppercase tracking-widest text-primary">{concert.artist}</p>
           <h1 className="mt-1 text-2xl font-bold leading-tight">{concert.title}</h1>
+          {concert.source === "seed" && (
+            <p className="mt-2 text-xs uppercase tracking-widest text-muted-foreground">Dato de prueba</p>
+          )}
         </div>
 
         <div className="grid gap-2 text-sm">

@@ -11,6 +11,7 @@ export type Concert = {
   lat: number;
   lng: number;
   buyUrl: string;
+  source?: string;
 };
 
 // Mock concerts in Buenos Aires. Replace with API data when ready.
