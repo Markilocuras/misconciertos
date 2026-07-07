@@ -72,9 +72,12 @@ function Index() {
   }, [fetchConcerts]);
 
   const filtered = useMemo(() => {
-    if (!date) return allConcerts;
-    return allConcerts.filter((c) => c.date >= date);
-  }, [date, allConcerts]);
+    return allConcerts.filter((c) => {
+      if (dateFrom && c.date < dateFrom) return false;
+      if (dateTo && c.date > dateTo) return false;
+      return true;
+    });
+  }, [dateFrom, dateTo, allConcerts]);
 
   const realCount = useMemo(() => allConcerts.filter((c) => c.source !== "seed").length, [allConcerts]);
 
