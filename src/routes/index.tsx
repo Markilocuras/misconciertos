@@ -9,6 +9,25 @@ import { listConcerts } from "@/lib/concerts.functions";
 import { Music2 } from "lucide-react";
 import { AuthMenu } from "@/components/AuthMenu";
 
+const FALLBACK_IMAGES = [
+  "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800",
+  "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=800",
+  "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=800",
+  "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800",
+  "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800",
+  "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=800",
+  "https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?w=800",
+  "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=800",
+  "https://images.unsplash.com/photo-1587731556938-38755b4803a6?w=800",
+  "https://images.unsplash.com/photo-1471478331149-c72f17e33c73?w=800",
+];
+
+function hashId(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
 
 export const Route = createFileRoute("/")({
   ssr: false,
@@ -36,7 +55,8 @@ function Index() {
   const fetchConcerts = useServerFn(listConcerts);
   const [allConcerts, setAllConcerts] = useState<Concert[]>([]);
   const [loading, setLoading] = useState(true);
-  const [date, setDate] = useState<string>("");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
   const [selected, setSelected] = useState<Concert | null>(null);
 
   useEffect(() => {
@@ -55,7 +75,7 @@ function Index() {
             time: c.time ?? "",
             price: c.price ?? "",
             description: c.description ?? "",
-            image: c.image_url ?? "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800",
+            image: c.image_url ?? FALLBACK_IMAGES[hashId(c.id) % FALLBACK_IMAGES.length],
             lat: c.lat as number,
             lng: c.lng as number,
             buyUrl: c.buy_url ?? "#",
@@ -71,9 +91,12 @@ function Index() {
   }, [fetchConcerts]);
 
   const filtered = useMemo(() => {
-    if (!date) return allConcerts;
-    return allConcerts.filter((c) => c.date >= date);
-  }, [date, allConcerts]);
+    return allConcerts.filter((c) => {
+      if (dateFrom && c.date < dateFrom) return false;
+      if (dateTo && c.date > dateTo) return false;
+      return true;
+    });
+  }, [dateFrom, dateTo, allConcerts]);
 
   const realCount = useMemo(() => allConcerts.filter((c) => c.source !== "seed").length, [allConcerts]);
 
@@ -107,7 +130,7 @@ function Index() {
           )}
         </div>
         <div className="pointer-events-auto flex items-center gap-3 md:ml-auto">
-          <DateFilter value={date} onChange={setDate} count={filtered.length} />
+          <DateFilter from={dateFrom} to={dateTo} onFromChange={setDateFrom} onToChange={setDateTo} count={filtered.length} />
           <AuthMenu />
         </div>
       </header>
