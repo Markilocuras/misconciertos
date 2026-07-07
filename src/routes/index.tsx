@@ -56,7 +56,7 @@ function Index() {
             time: c.time ?? "",
             price: c.price ?? "",
             description: c.description ?? "",
-            image: c.image_url ?? "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800",
+            image: c.image_url ?? FALLBACK_IMAGES[hashId(c.id) % FALLBACK_IMAGES.length],
             lat: c.lat as number,
             lng: c.lng as number,
             buyUrl: c.buy_url ?? "#",
