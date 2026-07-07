@@ -36,7 +36,8 @@ function Index() {
   const fetchConcerts = useServerFn(listConcerts);
   const [allConcerts, setAllConcerts] = useState<Concert[]>([]);
   const [loading, setLoading] = useState(true);
-  const [date, setDate] = useState<string>("");
+  const [dateFrom, setDateFrom] = useState<string>("");
+  const [dateTo, setDateTo] = useState<string>("");
   const [selected, setSelected] = useState<Concert | null>(null);
 
   useEffect(() => {
