@@ -111,7 +111,7 @@ function Index() {
           )}
         </div>
         <div className="pointer-events-auto flex items-center gap-3 md:ml-auto">
-          <DateFilter value={date} onChange={setDate} count={filtered.length} />
+          <DateFilter from={dateFrom} to={dateTo} onFromChange={setDateFrom} onToChange={setDateTo} count={filtered.length} />
           <AuthMenu />
         </div>
       </header>
