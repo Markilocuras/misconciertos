@@ -33,6 +33,7 @@ export const listConcerts = createServerFn({ method: "GET" }).handler(async () =
       "id, source, external_id, title, artist, venue, date, time, price, description, image_url, lat, lng, buy_url",
     )
     .gte("date", today)
+    .neq("source", "seed")
     .order("date", { ascending: true });
 
   if (error) {

@@ -98,8 +98,6 @@ function Index() {
     });
   }, [dateFrom, dateTo, allConcerts]);
 
-  const realCount = useMemo(() => allConcerts.filter((c) => c.source !== "seed").length, [allConcerts]);
-
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
       <div className={`absolute inset-0 ${selected ? "md:right-[420px]" : ""}`}>
@@ -122,11 +120,8 @@ function Index() {
           {!loading && allConcerts.length === 0 && (
             <span className="text-xs text-muted-foreground">sin conciertos disponibles</span>
           )}
-          {!loading && allConcerts.length > 0 && realCount === 0 && (
-            <span className="text-xs text-muted-foreground">datos de prueba</span>
-          )}
-          {!loading && realCount > 0 && (
-            <span className="text-xs text-muted-foreground">{realCount} reales</span>
+          {!loading && allConcerts.length > 0 && (
+            <span className="text-xs text-muted-foreground">{allConcerts.length} conciertos</span>
           )}
         </div>
         <div className="pointer-events-auto flex items-center gap-3 md:ml-auto">
