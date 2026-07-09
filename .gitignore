@@ -23,6 +23,10 @@ dist-ssr
 # Supabase CLI local link cache
 supabase/.temp/
 
+# npm lockfile: this project's canonical lockfile is bun.lock; package-lock.json
+# is only a local artifact from running npm on machines without bun installed.
+package-lock.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
