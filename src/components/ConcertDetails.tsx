@@ -44,9 +44,6 @@ export function ConcertDetails({ concert, onClose }: Props) {
         <div>
           <p className="text-xs uppercase tracking-widest text-primary">{concert.artist}</p>
           <h1 className="mt-1 text-2xl font-bold leading-tight">{concert.title}</h1>
-          {concert.source === "seed" && (
-            <p className="mt-2 text-xs uppercase tracking-widest text-muted-foreground">Dato de prueba</p>
-          )}
         </div>
 
         <div className="grid gap-2 text-sm">
@@ -58,19 +55,25 @@ export function ConcertDetails({ concert, onClose }: Props) {
             <Calendar className="h-4 w-4 text-primary" />
             <span className="capitalize">{dateLabel}</span>
           </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Clock className="h-4 w-4 text-primary" />
-            <span>{concert.time} hs</span>
-          </div>
+          {concert.time && (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Clock className="h-4 w-4 text-primary" />
+              <span>{concert.time} hs</span>
+            </div>
+          )}
         </div>
 
-        <p className="text-sm leading-relaxed text-foreground/80">{concert.description}</p>
+        {concert.description && (
+          <p className="text-sm leading-relaxed text-foreground/80">{concert.description}</p>
+        )}
 
         <div className="mt-auto space-y-3 pt-4">
-          <div className="flex items-baseline justify-between">
-            <span className="text-xs uppercase text-muted-foreground">Desde</span>
-            <span className="text-lg font-semibold">{concert.price}</span>
-          </div>
+          {concert.price && (
+            <div className="flex items-baseline justify-between">
+              <span className="text-xs uppercase text-muted-foreground">Desde</span>
+              <span className="text-lg font-semibold">{concert.price}</span>
+            </div>
+          )}
           <Button
             size="lg"
             className="w-full"

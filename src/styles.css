@@ -144,6 +144,33 @@
 }
 
 /* Concert map pins */
+.concert-pin-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: max-content;
+  /* --pin-half la setea ConcertMap según el tamaño del pin, para que el
+     centro del punto quede clavado en la coordenada aunque la etiqueta
+     del venue sea más ancha. */
+  transform: translateX(calc(-50% + var(--pin-half, 14px)));
+}
+.concert-pin-label {
+  margin-top: 3px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--foreground);
+  background: color-mix(in oklab, var(--background) 82%, transparent);
+  border: 1px solid color-mix(in oklab, var(--primary) 35%, transparent);
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+}
 .concert-pin {
   width: 28px;
   height: 28px;

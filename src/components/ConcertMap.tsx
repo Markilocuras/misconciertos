@@ -3,21 +3,32 @@ import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { Concert } from "@/data/concerts";
+import { isKnownVenue } from "@/lib/venues";
 
-// Fix default icon paths for bundlers
-const icon = new L.DivIcon({
-  className: "",
-  html: `<div class="concert-pin"><span></span></div>`,
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
-});
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
-const activeIcon = new L.DivIcon({
-  className: "",
-  html: `<div class="concert-pin concert-pin--active"><span></span></div>`,
-  iconSize: [36, 36],
-  iconAnchor: [18, 18],
-});
+// Los venues vienen de datos scrapeados: siempre escapados antes de inyectar
+// en el HTML del DivIcon.
+function concertIcon(concert: Concert, active: boolean): L.DivIcon {
+  const showVenue = isKnownVenue(concert.venue);
+  const label = showVenue
+    ? `<div class="concert-pin-label">${escapeHtml(concert.venue)}</div>`
+    : "";
+  const size = active ? 36 : 28;
+  return new L.DivIcon({
+    className: "",
+    html: `<div class="concert-pin-wrap" style="--pin-half:${size / 2}px"><div class="concert-pin${active ? " concert-pin--active" : ""}"><span></span></div>${label}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+}
 
 const DEFAULT_CENTER: [number, number] = [-34.6037, -58.3816];
 const DEFAULT_ZOOM = 12;
@@ -59,7 +70,7 @@ export function ConcertMap({ concerts, selectedId, onSelect }: Props) {
         <Marker
           key={c.id}
           position={[c.lat, c.lng]}
-          icon={c.id === selectedId ? activeIcon : icon}
+          icon={concertIcon(c, c.id === selectedId)}
           eventHandlers={{ click: () => onSelect(c) }}
         />
       ))}
