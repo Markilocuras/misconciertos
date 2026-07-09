@@ -8,15 +8,23 @@ import { supabase } from "@/integrations/supabase/client";
 export function AuthMenu() {
   const { user, loading } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) {
       setIsAdmin(false);
+      setUsername(null);
       return;
     }
     supabase
       .rpc("has_role", { _user_id: user.id, _role: "admin" })
       .then(({ data }) => setIsAdmin(!!data));
+    supabase
+      .from("profiles")
+      .select("username")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => setUsername(data?.username ?? null));
   }, [user]);
 
   if (loading) return null;
@@ -26,7 +34,7 @@ export function AuthMenu() {
       <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border/60 bg-background/85 px-3 py-1.5 shadow-lg backdrop-blur-md">
         <div className="flex items-center gap-2 px-1 text-xs text-foreground">
           <UserIcon className="h-3.5 w-3.5 text-primary" />
-          <span className="max-w-[160px] truncate">{user.email}</span>
+          <span className="max-w-[160px] truncate">{username ?? user.email}</span>
         </div>
         {isAdmin && (
           <Button asChild size="sm" variant="ghost" className="h-7 px-2" title="Estadísticas">

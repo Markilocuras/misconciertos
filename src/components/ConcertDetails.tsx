@@ -1,5 +1,6 @@
 import { Calendar, Clock, MapPin, Ticket, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ArtistComments } from "@/components/ArtistComments";
 import type { Concert } from "@/data/concerts";
 
 type Props = {
@@ -106,6 +107,8 @@ export function ConcertDetails({ concert, onClose }: Props) {
             Comprar entradas
           </Button>
         </div>
+
+        {concert.artist && <ArtistComments artist={concert.artist} />}
       </div>
     </div>
   );
