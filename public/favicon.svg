@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Círculo naranja (--primary del design system) con nota musical, como el logo del header -->
+  <circle cx="32" cy="32" r="30" fill="#1a1a24"/>
+  <circle cx="32" cy="32" r="30" fill="none" stroke="#f0a04b" stroke-width="3"/>
+  <g fill="#f0a04b">
+    <path d="M27 18v22.5a7.5 7.5 0 1 0 3 6V26h13v10.5a7.5 7.5 0 1 0 3 6V18z" transform="scale(0.82) translate(7 6)"/>
+  </g>
+</svg>

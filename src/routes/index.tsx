@@ -1,13 +1,16 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
-import { ConcertMap } from "@/components/ConcertMap";
+import { ClientOnly, createFileRoute } from "@tanstack/react-router";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { ConcertDetails } from "@/components/ConcertDetails";
 import { DateFilter } from "@/components/DateFilter";
 import { type Concert } from "@/data/concerts";
-import { listConcerts } from "@/lib/concerts.functions";
+import { listConcerts, type ConcertRow } from "@/lib/concerts.functions";
 import { Music2 } from "lucide-react";
 import { AuthMenu } from "@/components/AuthMenu";
+
+// Leaflet toca window al importarse: el mapa solo existe en el cliente.
+const ConcertMap = lazy(() =>
+  import("@/components/ConcertMap").then((m) => ({ default: m.ConcertMap })),
+);
 
 const FALLBACK_IMAGES = [
   "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800",
@@ -28,10 +31,61 @@ function hashId(id: string): number {
   return Math.abs(h);
 }
 
+function toConcert(c: ConcertRow): Concert | null {
+  if (c.lat == null || c.lng == null || c.date == null) return null;
+  return {
+    id: c.id,
+    title: c.title,
+    artist: c.artist ?? "",
+    venue: c.venue ?? "",
+    date: c.date,
+    time: c.time ?? "",
+    price: c.price ?? "",
+    description: c.description ?? "",
+    image: c.image_url ?? FALLBACK_IMAGES[hashId(c.id) % FALLBACK_IMAGES.length],
+    lat: c.lat,
+    lng: c.lng,
+    buyUrl: c.buy_url ?? "#",
+    source: c.source,
+  };
+}
+
+// Rich results de eventos para Google: cada concierto SSR'd como MusicEvent.
+function concertsJsonLd(concerts: Concert[]): string {
+  return JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: concerts.slice(0, 50).map((c, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      item: {
+        "@type": "MusicEvent",
+        name: c.title,
+        startDate: c.time ? `${c.date}T${c.time}:00-03:00` : c.date,
+        eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+        location: {
+          "@type": "Place",
+          name: c.venue || "Buenos Aires",
+          geo: { "@type": "GeoCoordinates", latitude: c.lat, longitude: c.lng },
+          address: { "@type": "PostalAddress", addressLocality: "Buenos Aires", addressCountry: "AR" },
+        },
+        ...(c.artist ? { performer: { "@type": "MusicGroup", name: c.artist } } : {}),
+        ...(c.image ? { image: [c.image] } : {}),
+        ...(c.buyUrl && c.buyUrl !== "#" ? { url: c.buyUrl } : {}),
+      },
+    })),
+  });
+}
 
 export const Route = createFileRoute("/")({
-  ssr: false,
-  head: () => ({
+  loader: async () => {
+    const res = await listConcerts();
+    const concerts = (res.concerts ?? [])
+      .map(toConcert)
+      .filter((c): c is Concert => c !== null);
+    return { concerts };
+  },
+  head: ({ loaderData }) => ({
     meta: [
       { title: "misconciertos — Mapa de recitales en Buenos Aires" },
       {
@@ -47,48 +101,23 @@ export const Route = createFileRoute("/")({
       { property: "og:url", content: "https://misconciertos.lovable.app/" },
     ],
     links: [{ rel: "canonical", href: "https://misconciertos.lovable.app/" }],
+    scripts: loaderData?.concerts.length
+      ? [
+          {
+            type: "application/ld+json",
+            children: concertsJsonLd(loaderData.concerts),
+          },
+        ]
+      : [],
   }),
   component: Index,
 });
 
 function Index() {
-  const fetchConcerts = useServerFn(listConcerts);
-  const [allConcerts, setAllConcerts] = useState<Concert[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { concerts: allConcerts } = Route.useLoaderData();
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [selected, setSelected] = useState<Concert | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchConcerts()
-      .then((res) => {
-        if (cancelled) return;
-        const mapped: Concert[] = (res.concerts ?? [])
-          .filter((c) => c.lat != null && c.lng != null && c.date != null)
-          .map((c) => ({
-            id: c.id,
-            title: c.title,
-            artist: c.artist ?? "",
-            venue: c.venue ?? "",
-            date: c.date as string,
-            time: c.time ?? "",
-            price: c.price ?? "",
-            description: c.description ?? "",
-            image: c.image_url ?? FALLBACK_IMAGES[hashId(c.id) % FALLBACK_IMAGES.length],
-            lat: c.lat as number,
-            lng: c.lng as number,
-            buyUrl: c.buy_url ?? "#",
-            source: c.source,
-          }));
-        setAllConcerts(mapped);
-      })
-      .catch((err) => console.error("[index] failed to load concerts", err))
-      .finally(() => !cancelled && setLoading(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchConcerts]);
 
   const filtered = useMemo(() => {
     return allConcerts.filter((c) => {
@@ -98,14 +127,20 @@ function Index() {
     });
   }, [dateFrom, dateTo, allConcerts]);
 
+  const mapFallback = <div className="h-full w-full bg-background" aria-hidden />;
+
   return (
     <main className="relative h-screen w-screen overflow-hidden bg-background text-foreground">
       <div className={`absolute inset-0 ${selected ? "md:right-[420px]" : ""}`}>
-        <ConcertMap
-          concerts={filtered}
-          selectedId={selected?.id ?? null}
-          onSelect={(c) => setSelected(c)}
-        />
+        <ClientOnly fallback={mapFallback}>
+          <Suspense fallback={mapFallback}>
+            <ConcertMap
+              concerts={filtered}
+              selectedId={selected?.id ?? null}
+              onSelect={(c) => setSelected(c)}
+            />
+          </Suspense>
+        </ClientOnly>
       </div>
 
       <header className={`pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between md:p-6 ${selected ? "md:pr-[440px]" : ""}`}>
@@ -116,11 +151,9 @@ function Index() {
           <h1 className="text-sm font-semibold tracking-tight">
             misconciertos <span className="hidden text-muted-foreground sm:inline">— Mapa de recitales</span>
           </h1>
-          {loading && <span className="text-xs text-muted-foreground">cargando…</span>}
-          {!loading && allConcerts.length === 0 && (
+          {allConcerts.length === 0 ? (
             <span className="text-xs text-muted-foreground">sin conciertos disponibles</span>
-          )}
-          {!loading && allConcerts.length > 0 && (
+          ) : (
             <span className="text-xs text-muted-foreground">{allConcerts.length} conciertos</span>
           )}
         </div>
