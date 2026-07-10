@@ -20,6 +20,10 @@ dist-ssr
 .wrangler/
 .dev.vars
 
+# Local secrets — never commit (this repo is public; a leaked
+# SUPABASE_SERVICE_ROLE_KEY bypasses all RLS). Copy .env.example instead.
+.env
+
 # Supabase CLI local link cache
 supabase/.temp/
 
