@@ -1,4 +1,8 @@
+import { useState } from "react";
 import { Calendar, X } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import type { Concert } from "@/data/concerts";
 
 type Props = {
   from: string;
@@ -6,10 +10,21 @@ type Props = {
   onFromChange: (v: string) => void;
   onToChange: (v: string) => void;
   count: number;
+  concerts: Concert[];
+  onSelectConcert: (c: Concert) => void;
 };
 
-export function DateFilter({ from, to, onFromChange, onToChange, count }: Props) {
+export function DateFilter({
+  from,
+  to,
+  onFromChange,
+  onToChange,
+  count,
+  concerts,
+  onSelectConcert,
+}: Props) {
   const hasFilter = from || to;
+  const [listOpen, setListOpen] = useState(false);
 
   return (
     <div className="pointer-events-auto flex items-center gap-2 rounded-2xl border border-border/60 bg-background/85 p-1.5 shadow-lg backdrop-blur-md">
@@ -46,9 +61,48 @@ export function DateFilter({ from, to, onFromChange, onToChange, count }: Props)
       </div>
 
       <div className="flex items-center gap-1.5 pr-2">
-        <span className="rounded-full bg-primary/15 px-2.5 py-1 text-xs font-bold text-primary">
-          {count}
-        </span>
+        <Popover open={listOpen} onOpenChange={setListOpen}>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="rounded-full bg-primary/15 px-2.5 py-1 text-xs font-bold text-primary transition hover:bg-primary/25"
+              aria-label={`Ver lista de ${count} conciertos`}
+            >
+              {count}
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-72 p-0" align="end">
+            {concerts.length === 0 ? (
+              <p className="p-4 text-center text-xs text-muted-foreground">
+                Sin conciertos en este rango.
+              </p>
+            ) : (
+              <ScrollArea className="h-80">
+                <div className="p-2">
+                  {concerts
+                    .slice()
+                    .sort((a, b) => a.date.localeCompare(b.date))
+                    .map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => {
+                          onSelectConcert(c);
+                          setListOpen(false);
+                        }}
+                        className="flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-accent"
+                      >
+                        <span className="font-medium">{c.artist || c.title}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {c.venue} · {c.date}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              </ScrollArea>
+            )}
+          </PopoverContent>
+        </Popover>
         {hasFilter && (
           <button
             onClick={() => {

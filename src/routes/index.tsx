@@ -125,7 +125,15 @@ function Index() {
           )}
         </div>
         <div className="pointer-events-auto flex items-center gap-3 md:ml-auto">
-          <DateFilter from={dateFrom} to={dateTo} onFromChange={setDateFrom} onToChange={setDateTo} count={filtered.length} />
+          <DateFilter
+            from={dateFrom}
+            to={dateTo}
+            onFromChange={setDateFrom}
+            onToChange={setDateTo}
+            count={filtered.length}
+            concerts={filtered}
+            onSelectConcert={(c) => setSelected(c)}
+          />
           <AuthMenu />
         </div>
       </header>
