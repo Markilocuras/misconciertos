@@ -72,14 +72,14 @@ export function DateFilter({
             </button>
           </PopoverTrigger>
           <PopoverContent className="w-72 p-0" align="end">
-            <ScrollArea className="max-h-80">
-              <div className="p-2">
-                {concerts.length === 0 ? (
-                  <p className="p-3 text-center text-xs text-muted-foreground">
-                    Sin conciertos en este rango.
-                  </p>
-                ) : (
-                  concerts
+            {concerts.length === 0 ? (
+              <p className="p-4 text-center text-xs text-muted-foreground">
+                Sin conciertos en este rango.
+              </p>
+            ) : (
+              <ScrollArea className="h-80">
+                <div className="p-2">
+                  {concerts
                     .slice()
                     .sort((a, b) => a.date.localeCompare(b.date))
                     .map((c) => (
@@ -97,10 +97,10 @@ export function DateFilter({
                           {c.venue} · {c.date}
                         </span>
                       </button>
-                    ))
-                )}
-              </div>
-            </ScrollArea>
+                    ))}
+                </div>
+              </ScrollArea>
+            )}
           </PopoverContent>
         </Popover>
         {hasFilter && (
