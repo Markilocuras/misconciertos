@@ -34,7 +34,7 @@ export default defineConfig(async ({ command, mode }) => {
     plugins,
     define: envDefine,
     // Matches Tailwind v4's own CSS pipeline so dev and build output agree.
-    css: { transformer: "lightningcss" },
+    css: { transformer: "lightningcss" as const },
     resolve: {
       dedupe: [
         "react",
