@@ -14,38 +14,6 @@ export type Database = {
   }
   public: {
     Tables: {
-      artist_comments: {
-        Row: {
-          artist: string
-          body: string
-          created_at: string
-          id: string
-          user_id: string
-        }
-        Insert: {
-          artist: string
-          body: string
-          created_at?: string
-          id?: string
-          user_id: string
-        }
-        Update: {
-          artist?: string
-          body?: string
-          created_at?: string
-          id?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "artist_comments_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       concert_clicks: {
         Row: {
           buy_url: string | null
@@ -162,24 +130,6 @@ export type Database = {
           id?: string
           updated_at?: string
           value?: string
-        }
-        Relationships: []
-      }
-      profiles: {
-        Row: {
-          created_at: string
-          id: string
-          username: string
-        }
-        Insert: {
-          created_at?: string
-          id: string
-          username: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          username?: string
         }
         Relationships: []
       }
