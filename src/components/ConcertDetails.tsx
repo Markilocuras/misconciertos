@@ -1,7 +1,10 @@
-import { Calendar, Clock, MapPin, Ticket, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Link } from "@tanstack/react-router";
+import { Calendar, Clock, ExternalLink, MapPin, X } from "lucide-react";
 import { ArtistComments } from "@/components/ArtistComments";
-import type { Concert } from "@/data/concerts";
+import { AddToCalendar } from "@/components/AddToCalendar";
+import { ShareButton } from "@/components/ShareButton";
+import { BuyButton } from "@/components/BuyButton";
+import { formatConcertDate, type Concert } from "@/data/concerts";
 
 type Props = {
   concert: Concert | null;
@@ -22,12 +25,6 @@ export function ConcertDetails({ concert, onClose }: Props) {
       </div>
     );
   }
-
-  const dateLabel = new Date(concert.date + "T00:00").toLocaleDateString("es-AR", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
@@ -54,7 +51,7 @@ export function ConcertDetails({ concert, onClose }: Props) {
           </div>
           <div className="flex items-center gap-2 text-muted-foreground">
             <Calendar className="h-4 w-4 text-primary" />
-            <span className="capitalize">{dateLabel}</span>
+            <span className="capitalize">{formatConcertDate(concert.date)}</span>
           </div>
           {concert.time && (
             <div className="flex items-center gap-2 text-muted-foreground">
@@ -75,37 +72,20 @@ export function ConcertDetails({ concert, onClose }: Props) {
               <span className="text-lg font-semibold">{concert.price}</span>
             </div>
           )}
-          <Button
-            size="lg"
-            className="w-full"
-            onClick={() => {
-              // Guardarraíl: solo abrir URLs http(s), nunca javascript:/data:
-              let safeUrl: string | null = null;
-              try {
-                const u = new URL(concert.buyUrl);
-                if (u.protocol === "http:" || u.protocol === "https:") {
-                  safeUrl = u.toString();
-                }
-              } catch {
-                safeUrl = null;
-              }
-              if (!safeUrl) return;
-              try {
-                fetch("/api/public/hooks/track-click", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ concertId: concert.id, buyUrl: safeUrl }),
-                  keepalive: true,
-                }).catch(() => {});
-              } catch {
-                // ignore
-              }
-              window.open(safeUrl, "_blank", "noopener,noreferrer");
-            }}
-          >
-            <Ticket className="mr-2 h-4 w-4" />
-            Comprar entradas
-          </Button>
+          <BuyButton concert={concert} />
+          <div className="flex flex-wrap items-center gap-2">
+            <AddToCalendar concert={concert} />
+            <ShareButton concert={concert} />
+          </div>
+          {concert.slug && (
+            <Link
+              to="/concierto/$slug"
+              params={{ slug: concert.slug }}
+              className="inline-flex items-center gap-1.5 text-sm text-primary hover:underline"
+            >
+              Ver página del concierto <ExternalLink className="h-3.5 w-3.5" />
+            </Link>
+          )}
         </div>
 
         {concert.artist && <ArtistComments artist={concert.artist} />}

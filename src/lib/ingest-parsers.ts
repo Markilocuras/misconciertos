@@ -123,6 +123,16 @@ export function deriveArtist(title: string): string | null {
   return title;
 }
 
+// Slug URL-safe: minúsculas, sin acentos, no-alfanuméricos colapsados a "-".
+export function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 export function formatArsPrice(amount: number): string {
   const rounded = Math.round(amount);
   const withDots = String(rounded).replace(/\B(?=(\d{3})+(?!\d))/g, ".");

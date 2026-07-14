@@ -11,8 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ConciertoSlugRouteImport } from './routes/concierto.$slug'
 import { Route as AuthenticatedAdminStatsRouteImport } from './routes/_authenticated/admin.stats'
 import { Route as ApiPublicHooksTrackClickRouteImport } from './routes/api/public/hooks/track-click'
 import { Route as ApiPublicHooksIngestConcertsRouteImport } from './routes/api/public/hooks/ingest-concerts'
@@ -27,6 +29,11 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AgendaRoute = AgendaRouteImport.update({
+  id: '/agenda',
+  path: '/agenda',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
@@ -34,6 +41,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConciertoSlugRoute = ConciertoSlugRouteImport.update({
+  id: '/concierto/$slug',
+  path: '/concierto/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAdminStatsRoute = AuthenticatedAdminStatsRouteImport.update({
@@ -56,16 +68,20 @@ const ApiPublicHooksIngestConcertsRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agenda': typeof AgendaRoute
   '/auth': typeof AuthRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/concierto/$slug': typeof ConciertoSlugRoute
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
   '/api/public/hooks/track-click': typeof ApiPublicHooksTrackClickRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agenda': typeof AgendaRoute
   '/auth': typeof AuthRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/concierto/$slug': typeof ConciertoSlugRoute
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
   '/api/public/hooks/track-click': typeof ApiPublicHooksTrackClickRoute
@@ -74,8 +90,10 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/agenda': typeof AgendaRoute
   '/auth': typeof AuthRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/concierto/$slug': typeof ConciertoSlugRoute
   '/_authenticated/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
   '/api/public/hooks/track-click': typeof ApiPublicHooksTrackClickRoute
@@ -84,16 +102,20 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/agenda'
     | '/auth'
     | '/sitemap.xml'
+    | '/concierto/$slug'
     | '/admin/stats'
     | '/api/public/hooks/ingest-concerts'
     | '/api/public/hooks/track-click'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/agenda'
     | '/auth'
     | '/sitemap.xml'
+    | '/concierto/$slug'
     | '/admin/stats'
     | '/api/public/hooks/ingest-concerts'
     | '/api/public/hooks/track-click'
@@ -101,8 +123,10 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/agenda'
     | '/auth'
     | '/sitemap.xml'
+    | '/concierto/$slug'
     | '/_authenticated/admin/stats'
     | '/api/public/hooks/ingest-concerts'
     | '/api/public/hooks/track-click'
@@ -111,8 +135,10 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AgendaRoute: typeof AgendaRoute
   AuthRoute: typeof AuthRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ConciertoSlugRoute: typeof ConciertoSlugRoute
   ApiPublicHooksIngestConcertsRoute: typeof ApiPublicHooksIngestConcertsRoute
   ApiPublicHooksTrackClickRoute: typeof ApiPublicHooksTrackClickRoute
 }
@@ -133,6 +159,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agenda': {
+      id: '/agenda'
+      path: '/agenda'
+      fullPath: '/agenda'
+      preLoaderRoute: typeof AgendaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
@@ -145,6 +178,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/concierto/$slug': {
+      id: '/concierto/$slug'
+      path: '/concierto/$slug'
+      fullPath: '/concierto/$slug'
+      preLoaderRoute: typeof ConciertoSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/admin/stats': {
@@ -185,8 +225,10 @@ const AuthenticatedRouteRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AgendaRoute: AgendaRoute,
   AuthRoute: AuthRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ConciertoSlugRoute: ConciertoSlugRoute,
   ApiPublicHooksIngestConcertsRoute: ApiPublicHooksIngestConcertsRoute,
   ApiPublicHooksTrackClickRoute: ApiPublicHooksTrackClickRoute,
 }
