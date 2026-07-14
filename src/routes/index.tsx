@@ -1,10 +1,10 @@
-import { ClientOnly, createFileRoute } from "@tanstack/react-router";
+import { ClientOnly, createFileRoute, Link } from "@tanstack/react-router";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { ConcertDetails } from "@/components/ConcertDetails";
 import { DateFilter } from "@/components/DateFilter";
-import { type Concert } from "@/data/concerts";
-import { listConcerts, type ConcertRow } from "@/lib/concerts.functions";
-import { Music2 } from "lucide-react";
+import { toConcert, type Concert } from "@/data/concerts";
+import { listConcerts } from "@/lib/concerts.functions";
+import { CalendarDays, Music2 } from "lucide-react";
 import { AuthMenu } from "@/components/AuthMenu";
 
 // Leaflet toca window al importarse: el mapa solo existe en el cliente.
@@ -12,43 +12,7 @@ const ConcertMap = lazy(() =>
   import("@/components/ConcertMap").then((m) => ({ default: m.ConcertMap })),
 );
 
-const FALLBACK_IMAGES = [
-  "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800",
-  "https://images.unsplash.com/photo-1501386761578-eac5c94b800a?w=800",
-  "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=800",
-  "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=800",
-  "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800",
-  "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=800",
-  "https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?w=800",
-  "https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?w=800",
-  "https://images.unsplash.com/photo-1587731556938-38755b4803a6?w=800",
-  "https://images.unsplash.com/photo-1471478331149-c72f17e33c73?w=800",
-];
-
-function hashId(id: string): number {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
-
-function toConcert(c: ConcertRow): Concert | null {
-  if (c.lat == null || c.lng == null || c.date == null) return null;
-  return {
-    id: c.id,
-    title: c.title,
-    artist: c.artist ?? "",
-    venue: c.venue ?? "",
-    date: c.date,
-    time: c.time ?? "",
-    price: c.price ?? "",
-    description: c.description ?? "",
-    image: c.image_url ?? FALLBACK_IMAGES[hashId(c.id) % FALLBACK_IMAGES.length],
-    lat: c.lat,
-    lng: c.lng,
-    buyUrl: c.buy_url ?? "#",
-    source: c.source,
-  };
-}
+const BASE_URL = "https://app.misconciertos.workers.dev";
 
 // Rich results de eventos para Google: cada concierto SSR'd como MusicEvent.
 function concertsJsonLd(concerts: Concert[]): string {
@@ -71,7 +35,7 @@ function concertsJsonLd(concerts: Concert[]): string {
         },
         ...(c.artist ? { performer: { "@type": "MusicGroup", name: c.artist } } : {}),
         ...(c.image ? { image: [c.image] } : {}),
-        ...(c.buyUrl && c.buyUrl !== "#" ? { url: c.buyUrl } : {}),
+        url: c.slug ? `${BASE_URL}/concierto/${c.slug}` : c.buyUrl,
       },
     })),
   });
@@ -98,9 +62,9 @@ export const Route = createFileRoute("/")({
         property: "og:description",
         content: "Conciertos en Buenos Aires, en un mapa interactivo.",
       },
-      { property: "og:url", content: "https://app.misconciertos.workers.dev/" },
+      { property: "og:url", content: `${BASE_URL}/` },
     ],
-    links: [{ rel: "canonical", href: "https://app.misconciertos.workers.dev/" }],
+    links: [{ rel: "canonical", href: `${BASE_URL}/` }],
     scripts: loaderData?.concerts.length
       ? [
           {
@@ -156,6 +120,13 @@ function Index() {
           ) : (
             <span className="text-xs text-muted-foreground">{allConcerts.length} conciertos</span>
           )}
+          <Link
+            to="/agenda"
+            className="ml-1 inline-flex items-center gap-1 rounded-full bg-accent/60 px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-accent"
+          >
+            <CalendarDays className="h-3 w-3 text-primary" />
+            Agenda
+          </Link>
         </div>
         <div className="pointer-events-auto flex items-center gap-3 md:ml-auto">
           <DateFilter

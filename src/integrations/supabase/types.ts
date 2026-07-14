@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      artist_alerts: {
+        Row: {
+          artist: string
+          created_at: string
+          email: string
+          id: string
+        }
+        Insert: {
+          artist: string
+          created_at?: string
+          email: string
+          id?: string
+        }
+        Update: {
+          artist?: string
+          created_at?: string
+          email?: string
+          id?: string
+        }
+        Relationships: []
+      }
       artist_comments: {
         Row: {
           artist: string
@@ -98,6 +119,7 @@ export type Database = {
           lat: number | null
           lng: number | null
           price: string | null
+          slug: string | null
           source: string
           time: string | null
           title: string
@@ -117,6 +139,7 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           price?: string | null
+          slug?: string | null
           source: string
           time?: string | null
           title: string
@@ -136,6 +159,7 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           price?: string | null
+          slug?: string | null
           source?: string
           time?: string | null
           title?: string
@@ -216,6 +240,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      trigger_concert_ingest: { Args: never; Returns: undefined }
     }
     Enums: {
       app_role: "admin" | "user"

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
+import { fetchUpcomingConcertRows } from "@/lib/concerts.functions";
 
 const BASE_URL = "https://app.misconciertos.workers.dev";
 
@@ -14,15 +15,23 @@ export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async () => {
+        const today = new Date().toISOString().slice(0, 10);
         // Only public, indexable routes. /auth and /admin/* are noindex.
         const entries: SitemapEntry[] = [
-          {
-            path: "/",
-            lastmod: new Date().toISOString().slice(0, 10),
-            changefreq: "daily",
-            priority: "1.0",
-          },
+          { path: "/", lastmod: today, changefreq: "daily", priority: "1.0" },
+          { path: "/agenda", lastmod: today, changefreq: "daily", priority: "0.8" },
         ];
+
+        const { concerts } = await fetchUpcomingConcertRows();
+        for (const c of concerts) {
+          if (!c.slug) continue;
+          entries.push({
+            path: `/concierto/${c.slug}`,
+            lastmod: c.updated_at?.slice(0, 10),
+            changefreq: "weekly",
+            priority: "0.7",
+          });
+        }
 
         const urls = entries.map((e) =>
           [
