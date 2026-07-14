@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as Google7442d18f9dbf8186DothtmlRouteImport } from './routes/google7442d18f9dbf8186[.]html'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
@@ -24,6 +25,12 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
+const Google7442d18f9dbf8186DothtmlRoute =
+  Google7442d18f9dbf8186DothtmlRouteImport.update({
+    id: '/google7442d18f9dbf8186.html',
+    path: '/google7442d18f9dbf8186.html',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -70,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/auth': typeof AuthRoute
+  '/google7442d18f9dbf8186.html': typeof Google7442d18f9dbf8186DothtmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/concierto/$slug': typeof ConciertoSlugRoute
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
@@ -80,6 +88,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/auth': typeof AuthRoute
+  '/google7442d18f9dbf8186.html': typeof Google7442d18f9dbf8186DothtmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/concierto/$slug': typeof ConciertoSlugRoute
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
@@ -92,6 +101,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/agenda': typeof AgendaRoute
   '/auth': typeof AuthRoute
+  '/google7442d18f9dbf8186.html': typeof Google7442d18f9dbf8186DothtmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/concierto/$slug': typeof ConciertoSlugRoute
   '/_authenticated/admin/stats': typeof AuthenticatedAdminStatsRoute
@@ -104,6 +114,7 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/auth'
+    | '/google7442d18f9dbf8186.html'
     | '/sitemap.xml'
     | '/concierto/$slug'
     | '/admin/stats'
@@ -114,6 +125,7 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/auth'
+    | '/google7442d18f9dbf8186.html'
     | '/sitemap.xml'
     | '/concierto/$slug'
     | '/admin/stats'
@@ -125,6 +137,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/agenda'
     | '/auth'
+    | '/google7442d18f9dbf8186.html'
     | '/sitemap.xml'
     | '/concierto/$slug'
     | '/_authenticated/admin/stats'
@@ -137,6 +150,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AgendaRoute: typeof AgendaRoute
   AuthRoute: typeof AuthRoute
+  Google7442d18f9dbf8186DothtmlRoute: typeof Google7442d18f9dbf8186DothtmlRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ConciertoSlugRoute: typeof ConciertoSlugRoute
   ApiPublicHooksIngestConcertsRoute: typeof ApiPublicHooksIngestConcertsRoute
@@ -150,6 +164,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/google7442d18f9dbf8186.html': {
+      id: '/google7442d18f9dbf8186.html'
+      path: '/google7442d18f9dbf8186.html'
+      fullPath: '/google7442d18f9dbf8186.html'
+      preLoaderRoute: typeof Google7442d18f9dbf8186DothtmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -227,6 +248,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AgendaRoute: AgendaRoute,
   AuthRoute: AuthRoute,
+  Google7442d18f9dbf8186DothtmlRoute: Google7442d18f9dbf8186DothtmlRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ConciertoSlugRoute: ConciertoSlugRoute,
   ApiPublicHooksIngestConcertsRoute: ApiPublicHooksIngestConcertsRoute,
