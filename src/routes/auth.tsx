@@ -26,10 +26,10 @@ export const Route = createFileRoute("/auth")({
         property: "og:description",
         content: "Iniciá sesión o registrate en misconciertos.",
       },
-      { property: "og:url", content: "https://misconciertos.lovable.app/auth" },
+      { property: "og:url", content: "https://app.misconciertos.workers.dev/auth" },
       { name: "robots", content: "noindex, follow" },
     ],
-    links: [{ rel: "canonical", href: "https://misconciertos.lovable.app/auth" }],
+    links: [{ rel: "canonical", href: "https://app.misconciertos.workers.dev/auth" }],
   }),
   component: AuthPage,
 });

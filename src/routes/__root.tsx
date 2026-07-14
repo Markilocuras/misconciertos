@@ -96,8 +96,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "Mapa interactivo de conciertos en Buenos Aires. Filtrá por fecha y comprá entradas.",
       },
-      { property: "og:image", content: "https://misconciertos.lovable.app/og.png" },
-      { name: "twitter:image", content: "https://misconciertos.lovable.app/og.png" },
+      { property: "og:image", content: "https://app.misconciertos.workers.dev/og.png" },
+      { name: "twitter:image", content: "https://app.misconciertos.workers.dev/og.png" },
     ],
     links: [
       {
@@ -119,12 +119,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
             {
               "@type": "Organization",
               name: "misconciertos",
-              url: "https://misconciertos.lovable.app",
+              url: "https://app.misconciertos.workers.dev",
             },
             {
               "@type": "WebSite",
               name: "misconciertos",
-              url: "https://misconciertos.lovable.app",
+              url: "https://app.misconciertos.workers.dev",
               inLanguage: "es-AR",
             },
           ],

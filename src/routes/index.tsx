@@ -98,9 +98,9 @@ export const Route = createFileRoute("/")({
         property: "og:description",
         content: "Conciertos en Buenos Aires, en un mapa interactivo.",
       },
-      { property: "og:url", content: "https://misconciertos.lovable.app/" },
+      { property: "og:url", content: "https://app.misconciertos.workers.dev/" },
     ],
-    links: [{ rel: "canonical", href: "https://misconciertos.lovable.app/" }],
+    links: [{ rel: "canonical", href: "https://app.misconciertos.workers.dev/" }],
     scripts: loaderData?.concerts.length
       ? [
           {

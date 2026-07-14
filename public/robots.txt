@@ -4,4 +4,4 @@ Disallow: /auth
 Disallow: /admin
 Disallow: /api/
 
-Sitemap: https://misconciertos.lovable.app/sitemap.xml
+Sitemap: https://app.misconciertos.workers.dev/sitemap.xml
