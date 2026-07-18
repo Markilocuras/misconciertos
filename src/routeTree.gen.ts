@@ -16,6 +16,7 @@ import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConciertoSlugRouteImport } from './routes/concierto.$slug'
+import { Route as AuthenticatedPerfilRouteImport } from './routes/_authenticated/perfil'
 import { Route as AuthenticatedAdminStatsRouteImport } from './routes/_authenticated/admin.stats'
 import { Route as ApiPublicHooksTrackClickRouteImport } from './routes/api/public/hooks/track-click'
 import { Route as ApiPublicHooksIngestConcertsRouteImport } from './routes/api/public/hooks/ingest-concerts'
@@ -55,6 +56,11 @@ const ConciertoSlugRoute = ConciertoSlugRouteImport.update({
   path: '/concierto/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedPerfilRoute = AuthenticatedPerfilRouteImport.update({
+  id: '/perfil',
+  path: '/perfil',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAdminStatsRoute = AuthenticatedAdminStatsRouteImport.update({
   id: '/admin/stats',
   path: '/admin/stats',
@@ -79,6 +85,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/google7442d18f9dbf8186.html': typeof Google7442d18f9dbf8186DothtmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/perfil': typeof AuthenticatedPerfilRoute
   '/concierto/$slug': typeof ConciertoSlugRoute
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/google7442d18f9dbf8186.html': typeof Google7442d18f9dbf8186DothtmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/perfil': typeof AuthenticatedPerfilRoute
   '/concierto/$slug': typeof ConciertoSlugRoute
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/google7442d18f9dbf8186.html': typeof Google7442d18f9dbf8186DothtmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
   '/concierto/$slug': typeof ConciertoSlugRoute
   '/_authenticated/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
@@ -116,6 +125,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/google7442d18f9dbf8186.html'
     | '/sitemap.xml'
+    | '/perfil'
     | '/concierto/$slug'
     | '/admin/stats'
     | '/api/public/hooks/ingest-concerts'
@@ -127,6 +137,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/google7442d18f9dbf8186.html'
     | '/sitemap.xml'
+    | '/perfil'
     | '/concierto/$slug'
     | '/admin/stats'
     | '/api/public/hooks/ingest-concerts'
@@ -139,6 +150,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/google7442d18f9dbf8186.html'
     | '/sitemap.xml'
+    | '/_authenticated/perfil'
     | '/concierto/$slug'
     | '/_authenticated/admin/stats'
     | '/api/public/hooks/ingest-concerts'
@@ -208,6 +220,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConciertoSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/perfil': {
+      id: '/_authenticated/perfil'
+      path: '/perfil'
+      fullPath: '/perfil'
+      preLoaderRoute: typeof AuthenticatedPerfilRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/admin/stats': {
       id: '/_authenticated/admin/stats'
       path: '/admin/stats'
@@ -233,10 +252,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteRouteChildren {
+  AuthenticatedPerfilRoute: typeof AuthenticatedPerfilRoute
   AuthenticatedAdminStatsRoute: typeof AuthenticatedAdminStatsRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedPerfilRoute: AuthenticatedPerfilRoute,
   AuthenticatedAdminStatsRoute: AuthenticatedAdminStatsRoute,
 }
 
