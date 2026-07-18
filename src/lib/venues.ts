@@ -51,6 +51,7 @@ export const VENUE_COORDS: Record<string, { lat: number; lng: number }> = {
   "teatro el nacional": { lat: -34.6033, lng: -58.38 },
   tecnopolis: { lat: -34.5545, lng: -58.5088 },
   "estadio huracan": { lat: -34.6432, lng: -58.3976 },
+  "estadio argentinos juniors": { lat: -34.6062, lng: -58.4744 },
   "tomas adolfo duco": { lat: -34.6432, lng: -58.3976 },
   "hipodromo de san isidro": { lat: -34.4841, lng: -58.5236 },
   "estadio ferro": { lat: -34.6187, lng: -58.4472 },

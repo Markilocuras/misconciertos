@@ -398,3 +398,150 @@ export function parseDalePlayLive(html: string): ScrapedEvent[] {
 
   return events.filter((e) => e.title && e.date && e.buy_url);
 }
+
+// ---------------------------------------------------------------------------
+// ticketek.com.ar — SPA de Angular; los datos salen de su API CMS en JSON.
+// La URL de la API lleva el querystring percent-encodeado dentro del path y
+// usa "--" en lugar de "/" para rutas anidadas (así lo llama su propio front).
+// ---------------------------------------------------------------------------
+
+export const TICKETEK_API_BASE = "https://prod-cms-api.ticketek.com.ar/api/1.0/node%3Fpath%3D";
+export const TICKETEK_SITE = "https://www.ticketek.com.ar";
+
+export function ticketekApiUrl(path: string): string {
+  return TICKETEK_API_BASE + path.replace(/\//g, "--");
+}
+
+function httpsImage(input: unknown): string | null {
+  if (typeof input !== "string" || !input) return null;
+  return safeHttpUrl(input.startsWith("//") ? `https:${input}` : input);
+}
+
+type UnknownRecord = Record<string, unknown>;
+
+function collectByType(root: unknown, type: string, out: UnknownRecord[] = []): UnknownRecord[] {
+  if (Array.isArray(root)) {
+    for (const item of root) collectByType(item, type, out);
+    return out;
+  }
+  if (root && typeof root === "object") {
+    const record = root as UnknownRecord;
+    if (record.type === type) out.push(record);
+    for (const value of Object.values(record)) collectByType(value, type, out);
+  }
+  return out;
+}
+
+export type TicketekListItem = {
+  name: string;
+  url: string;
+  venue: string | null;
+  state: string | null;
+  image: string | null;
+};
+
+export function parseTicketekMusicList(json: unknown): TicketekListItem[] {
+  const widgets = (json as UnknownRecord | null)?.widgets;
+  const items = collectByType(widgets, "tkt-artist-list-item");
+  const seen = new Set<string>();
+  const out: TicketekListItem[] = [];
+  for (const item of items) {
+    const name = typeof item.name === "string" ? item.name.trim() : "";
+    const url = typeof item.url === "string" ? item.url.trim() : "";
+    if (!name || !url || seen.has(url)) continue;
+    seen.add(url);
+    const venue = (item.venue ?? null) as UnknownRecord | null;
+    out.push({
+      name,
+      url,
+      venue: typeof venue?.title === "string" ? venue.title : null,
+      state: typeof venue?.state === "string" ? venue.state : null,
+      image: httpsImage(item.image),
+    });
+  }
+  return out;
+}
+
+export type TicketekArtistShow = {
+  link: string;
+  venue: string | null;
+  locality: string | null;
+  image: string | null;
+};
+
+export function parseTicketekArtistShows(json: unknown): TicketekArtistShow[] {
+  const widgets = (json as UnknownRecord | null)?.widgets;
+  const items = collectByType(widgets, "tkt-artist-shows-item");
+  const out: TicketekArtistShow[] = [];
+  for (const item of items) {
+    const link = typeof item.link === "string" ? item.link.trim() : "";
+    if (!link) continue;
+    out.push({
+      link,
+      venue: typeof item["venue-title"] === "string" ? (item["venue-title"] as string) : null,
+      locality:
+        typeof item["venue-locality"] === "string" ? (item["venue-locality"] as string) : null,
+      image: httpsImage(item.image),
+    });
+  }
+  return out;
+}
+
+export type TicketekPerformance = {
+  date: string; // YYYY-MM-DD (hora de Buenos Aires)
+  time: string | null;
+  price: string | null;
+};
+
+// Los timestamps de Ticketek ya vienen en hora argentina "disfrazada" de UTC
+// (verificado contra date_display: 1792875600 → "Sabado 24 Octubre 21Hs"),
+// así que se leen los componentes UTC tal cual, sin corrimiento.
+function unixToArDateTime(ts: number): { date: string; time: string | null } {
+  const iso = new Date(ts * 1000).toISOString();
+  const time = iso.slice(11, 16);
+  return { date: iso.slice(0, 10), time: time === "00:00" ? null : time };
+}
+
+function parsePriceNumber(input: unknown): number | null {
+  if (typeof input !== "string" && typeof input !== "number") return null;
+  const n = Number(String(input).replace(/\./g, "").replace(/,/g, "."));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+export function parseTicketekShow(json: unknown): TicketekPerformance[] {
+  const widgets = (json as UnknownRecord | null)?.widgets;
+  // Cada función es un objeto con perf_id + date (unix) + price_types.
+  const perfs: UnknownRecord[] = [];
+  (function walk(node: unknown) {
+    if (Array.isArray(node)) return node.forEach(walk);
+    if (node && typeof node === "object") {
+      const record = node as UnknownRecord;
+      if (typeof record.perf_id === "number" && typeof record.date === "number") {
+        perfs.push(record);
+      }
+      Object.values(record).forEach(walk);
+    }
+  })(widgets);
+
+  return perfs.map((perf) => {
+    const { date, time } = unixToArDateTime(perf.date as number);
+    const available: number[] = [];
+    const all: number[] = [];
+    (function collectPrices(node: unknown) {
+      if (Array.isArray(node)) return node.forEach(collectPrices);
+      if (node && typeof node === "object") {
+        const record = node as UnknownRecord;
+        if ("pc_id" in record) {
+          const price = parsePriceNumber(record.price);
+          if (price) {
+            all.push(price);
+            if (record.availability === "AVAILABLE") available.push(price);
+          }
+        }
+        Object.values(record).forEach(collectPrices);
+      }
+    })(perf.price_types);
+    const min = available.length ? Math.min(...available) : all.length ? Math.min(...all) : null;
+    return { date, time, price: min ? formatArsPrice(min) : null };
+  });
+}
