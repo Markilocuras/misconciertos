@@ -5,6 +5,7 @@ import { getConcertBySlug } from "@/lib/concerts.functions";
 import { ArtistComments } from "@/components/ArtistComments";
 import { ArtistAlert } from "@/components/ArtistAlert";
 import { AddToCalendar } from "@/components/AddToCalendar";
+import { SaveButton } from "@/components/SaveButton";
 import { ShareButton } from "@/components/ShareButton";
 import { BuyButton } from "@/components/BuyButton";
 
@@ -135,6 +136,7 @@ function ConcertPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <AddToCalendar concert={concert} />
                 <ShareButton concert={concert} />
+                <SaveButton concertId={concert.id} />
               </div>
             </div>
 

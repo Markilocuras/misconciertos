@@ -32,10 +32,14 @@ export function AuthMenu() {
   if (user) {
     return (
       <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border/60 bg-background/85 px-3 py-1.5 shadow-lg backdrop-blur-md">
-        <div className="flex items-center gap-2 px-1 text-xs text-foreground">
+        <Link
+          to="/perfil"
+          className="flex items-center gap-2 px-1 text-xs text-foreground transition hover:text-primary"
+          title="Mi perfil"
+        >
           <UserIcon className="h-3.5 w-3.5 text-primary" />
           <span className="max-w-[160px] truncate">{username ?? user.email}</span>
-        </div>
+        </Link>
         {isAdmin && (
           <Button asChild size="sm" variant="ghost" className="h-7 px-2" title="Estadísticas">
             <Link to="/admin/stats">

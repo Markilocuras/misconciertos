@@ -207,6 +207,42 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_concerts: {
+        Row: {
+          concert_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          concert_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          concert_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "saved_concerts_concert_id_fkey"
+            columns: ["concert_id"]
+            isOneToOne: false
+            referencedRelation: "concerts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "saved_concerts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string

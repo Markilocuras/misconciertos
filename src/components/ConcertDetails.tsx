@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { Calendar, Clock, ExternalLink, MapPin, X } from "lucide-react";
 import { ArtistComments } from "@/components/ArtistComments";
 import { AddToCalendar } from "@/components/AddToCalendar";
+import { SaveButton } from "@/components/SaveButton";
 import { ShareButton } from "@/components/ShareButton";
 import { BuyButton } from "@/components/BuyButton";
 import { formatConcertDate, type Concert } from "@/data/concerts";
@@ -76,6 +77,7 @@ export function ConcertDetails({ concert, onClose }: Props) {
           <div className="flex flex-wrap items-center gap-2">
             <AddToCalendar concert={concert} />
             <ShareButton concert={concert} />
+            <SaveButton concertId={concert.id} />
           </div>
           {concert.slug && (
             <Link
