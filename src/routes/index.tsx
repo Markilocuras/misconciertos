@@ -4,6 +4,7 @@ import { ConcertDetails } from "@/components/ConcertDetails";
 import { DateFilter } from "@/components/DateFilter";
 import { toConcert, type Concert } from "@/data/concerts";
 import { listConcerts } from "@/lib/concerts.functions";
+import { SITE_URL } from "@/lib/site";
 import { CalendarDays, Music2 } from "lucide-react";
 import { AuthMenu } from "@/components/AuthMenu";
 
@@ -11,8 +12,6 @@ import { AuthMenu } from "@/components/AuthMenu";
 const ConcertMap = lazy(() =>
   import("@/components/ConcertMap").then((m) => ({ default: m.ConcertMap })),
 );
-
-const BASE_URL = "https://app.misconciertos.workers.dev";
 
 // Rich results de eventos para Google: cada concierto SSR'd como MusicEvent.
 function concertsJsonLd(concerts: Concert[]): string {
@@ -35,7 +34,7 @@ function concertsJsonLd(concerts: Concert[]): string {
         },
         ...(c.artist ? { performer: { "@type": "MusicGroup", name: c.artist } } : {}),
         ...(c.image ? { image: [c.image] } : {}),
-        url: c.slug ? `${BASE_URL}/concierto/${c.slug}` : c.buyUrl,
+        url: c.slug ? `${SITE_URL}/concierto/${c.slug}` : c.buyUrl,
       },
     })),
   });
@@ -62,9 +61,9 @@ export const Route = createFileRoute("/")({
         property: "og:description",
         content: "Conciertos en Buenos Aires, en un mapa interactivo.",
       },
-      { property: "og:url", content: `${BASE_URL}/` },
+      { property: "og:url", content: `${SITE_URL}/` },
     ],
-    links: [{ rel: "canonical", href: `${BASE_URL}/` }],
+    links: [{ rel: "canonical", href: `${SITE_URL}/` }],
     scripts: loaderData?.concerts.length
       ? [
           {
