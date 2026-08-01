@@ -29,7 +29,9 @@ There is no test suite/framework configured in this repo currently.
 - `bun run build` — produces `.output/`
 - `npx wrangler deploy` — ships it (picks up `.wrangler/deploy/config.json` → `.output/server/wrangler.json`, worker `name: "app"`)
 
-Live at `https://app.misconciertos.workers.dev` (this URL is also hardcoded in `src/routes/__root.tsx`'s SEO/OG/JSON-LD meta).
+Live at `https://misconciertos.com.ar`. That origin is **not** hardcoded per-file — it lives in `src/lib/site.ts` as `SITE_URL`, which every canonical/OG/JSON-LD/sitemap/robots URL derives from. Change it there and nowhere else.
+
+Cloudflare keeps the Worker's own `app.misconciertos.workers.dev` hostname serving alongside the custom domain, so `src/server.ts` 301s that host (`LEGACY_HOST` in the same module) to `SITE_URL` to avoid duplicate content. Two consequences worth remembering: anything server-side that POSTs to the app must target the custom domain, because `net.http_post` in Postgres does not follow redirects (this is why `supabase/migrations/20260801000000_point_ingest_cron_at_custom_domain.sql` exists), and Supabase Auth's Site URL / Redirect URLs allowlist must include the custom domain or `emailRedirectTo` silently falls back to the old one.
 
 **Lovable's "Publish" button no longer works and is not expected to.** It fails with `dist-check failed with exit status 1` because that gate looks for a `dist/` directory, which this project stopped producing when it moved to nitro + Cloudflare Workers. Don't try to fix the Lovable publish — use wrangler.
 
