@@ -2,8 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, CalendarDays, Clock, MapPin } from "lucide-react";
 import { toConcert, formatConcertDate, type Concert } from "@/data/concerts";
 import { listConcerts } from "@/lib/concerts.functions";
+import { SITE_URL } from "@/lib/site";
 
-const BASE_URL = "https://app.misconciertos.workers.dev";
 const WEEK_DAYS = 7;
 
 function plusDays(date: string, days: number): string {
@@ -28,7 +28,7 @@ function agendaJsonLd(concerts: Concert[]): string {
     itemListElement: concerts.map((c, i) => ({
       "@type": "ListItem",
       position: i + 1,
-      url: c.slug ? `${BASE_URL}/concierto/${c.slug}` : c.buyUrl,
+      url: c.slug ? `${SITE_URL}/concierto/${c.slug}` : c.buyUrl,
     })),
   });
 }
@@ -56,9 +56,9 @@ export const Route = createFileRoute("/agenda")({
         { name: "description", content: description },
         { property: "og:title", content: title },
         { property: "og:description", content: description },
-        { property: "og:url", content: `${BASE_URL}/agenda` },
+        { property: "og:url", content: `${SITE_URL}/agenda` },
       ],
-      links: [{ rel: "canonical", href: `${BASE_URL}/agenda` }],
+      links: [{ rel: "canonical", href: `${SITE_URL}/agenda` }],
       scripts: loaderData?.concerts.length
         ? [{ type: "application/ld+json", children: agendaJsonLd(loaderData.concerts) }]
         : [],

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { SITE_URL } from "@/lib/site";
 import { toast } from "sonner";
 
 type Mode = "login" | "register";
@@ -26,10 +27,10 @@ export const Route = createFileRoute("/auth")({
         property: "og:description",
         content: "Iniciá sesión o registrate en misconciertos.",
       },
-      { property: "og:url", content: "https://app.misconciertos.workers.dev/auth" },
+      { property: "og:url", content: `${SITE_URL}/auth` },
       { name: "robots", content: "noindex, follow" },
     ],
-    links: [{ rel: "canonical", href: "https://app.misconciertos.workers.dev/auth" }],
+    links: [{ rel: "canonical", href: `${SITE_URL}/auth` }],
   }),
   component: AuthPage,
 });

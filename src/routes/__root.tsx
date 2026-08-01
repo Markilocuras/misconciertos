@@ -10,6 +10,7 @@ import {
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
+import { SITE_URL } from "@/lib/site";
 
 
 function NotFoundComponent() {
@@ -96,8 +97,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "Mapa interactivo de conciertos en Buenos Aires. Filtrá por fecha y comprá entradas.",
       },
-      { property: "og:image", content: "https://app.misconciertos.workers.dev/og.png" },
-      { name: "twitter:image", content: "https://app.misconciertos.workers.dev/og.png" },
+      { property: "og:image", content: `${SITE_URL}/og.png` },
+      { name: "twitter:image", content: `${SITE_URL}/og.png` },
     ],
     links: [
       {
@@ -119,12 +120,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
             {
               "@type": "Organization",
               name: "misconciertos",
-              url: "https://app.misconciertos.workers.dev",
+              url: SITE_URL,
             },
             {
               "@type": "WebSite",
               name: "misconciertos",
-              url: "https://app.misconciertos.workers.dev",
+              url: SITE_URL,
               inLanguage: "es-AR",
             },
           ],

@@ -3,6 +3,7 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { applySecurityHeaders } from "./lib/security-headers";
+import { LEGACY_HOST, SITE_URL } from "./lib/site";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -67,9 +68,22 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   return brandedErrorResponse();
 }
 
+// Cloudflare deja vivo el dominio workers.dev además del dominio propio, así que
+// el mismo contenido quedaba servido en dos orígenes. Redirigir con 301 (en vez
+// de solo apuntar el canonical) consolida el ranking en misconciertos.com.ar y
+// evita que los buscadores traten al Worker como un sitio duplicado.
+function legacyHostRedirect(request: Request): Response | null {
+  const url = new URL(request.url);
+  if (url.hostname !== LEGACY_HOST) return null;
+  return Response.redirect(`${SITE_URL}${url.pathname}${url.search}`, 301);
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const redirect = legacyHostRedirect(request);
+      if (redirect) return redirect;
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return applySecurityHeaders(await normalizeCatastrophicSsrResponse(response));

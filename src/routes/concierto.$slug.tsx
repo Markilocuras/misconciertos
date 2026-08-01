@@ -8,8 +8,7 @@ import { AddToCalendar } from "@/components/AddToCalendar";
 import { SaveButton } from "@/components/SaveButton";
 import { ShareButton } from "@/components/ShareButton";
 import { BuyButton } from "@/components/BuyButton";
-
-const BASE_URL = "https://app.misconciertos.workers.dev";
+import { SITE_URL } from "@/lib/site";
 
 function parsePriceArs(price: string): number | null {
   const digits = price.replace(/[^\d]/g, "");
@@ -35,7 +34,7 @@ function concertJsonLd(c: Concert, slug: string): string {
     },
     ...(c.artist ? { performer: { "@type": "MusicGroup", name: c.artist } } : {}),
     ...(c.image ? { image: [c.image] } : {}),
-    url: `${BASE_URL}/concierto/${slug}`,
+    url: `${SITE_URL}/concierto/${slug}`,
     ...(c.buyUrl && c.buyUrl !== "#"
       ? {
           offers: {
@@ -61,7 +60,7 @@ export const Route = createFileRoute("/concierto/$slug")({
     const { concert: c, slug } = loaderData;
     const title = `${c.artist || c.title} en ${c.venue} (${c.date}) — misconciertos`;
     const description = `${c.artist || c.title} toca en ${c.venue}, Buenos Aires, el ${formatConcertDate(c.date)}${c.time ? ` a las ${c.time} hs` : ""}.${c.price ? ` Entradas desde ${c.price}.` : ""} Comprá tu entrada.`;
-    const pageUrl = `${BASE_URL}/concierto/${slug}`;
+    const pageUrl = `${SITE_URL}/concierto/${slug}`;
     return {
       meta: [
         { title },
