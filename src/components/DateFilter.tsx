@@ -27,13 +27,17 @@ export function DateFilter({
   const [listOpen, setListOpen] = useState(false);
 
   return (
-    <div className="pointer-events-auto flex items-center gap-2 rounded-2xl border border-border/60 bg-background/85 p-1.5 shadow-lg backdrop-blur-md">
-      <div className="flex items-center gap-2 rounded-xl bg-accent/40 px-3 py-2">
-        <div className="rounded-lg bg-primary/20 p-1">
+    <div className="pointer-events-auto flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-border/60 bg-background/85 p-1.5 shadow-lg backdrop-blur-md md:flex-none">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-xl bg-accent/40 px-2 py-2 md:flex-none md:gap-2 md:px-3">
+        <div className="hidden rounded-lg bg-primary/20 p-1 sm:block">
           <Calendar className="h-3.5 w-3.5 text-primary" />
         </div>
-        <div className="flex items-center gap-1.5">
-          <label htmlFor="date-from" className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 md:flex-none">
+          {/* En celular no entran las etiquetas: las dejamos sólo para lectores de pantalla. */}
+          <label
+            htmlFor="date-from"
+            className="sr-only text-[10px] font-semibold uppercase tracking-wider text-muted-foreground md:not-sr-only"
+          >
             Desde
           </label>
           <input
@@ -41,12 +45,15 @@ export function DateFilter({
             type="date"
             value={from}
             onChange={(e) => onFromChange(e.target.value)}
-            className="w-[130px] bg-transparent text-sm font-medium text-foreground outline-none [color-scheme:dark]"
+            className="w-full min-w-0 bg-transparent text-sm font-medium text-foreground outline-none [color-scheme:dark] md:w-[130px]"
           />
         </div>
-        <div className="h-4 w-px bg-border/60" />
-        <div className="flex items-center gap-1.5">
-          <label htmlFor="date-to" className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="h-4 w-px shrink-0 bg-border/60" />
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 md:flex-none">
+          <label
+            htmlFor="date-to"
+            className="sr-only text-[10px] font-semibold uppercase tracking-wider text-muted-foreground md:not-sr-only"
+          >
             Hasta
           </label>
           <input
@@ -55,12 +62,12 @@ export function DateFilter({
             value={to}
             min={from || undefined}
             onChange={(e) => onToChange(e.target.value)}
-            className="w-[130px] bg-transparent text-sm font-medium text-foreground outline-none [color-scheme:dark]"
+            className="w-full min-w-0 bg-transparent text-sm font-medium text-foreground outline-none [color-scheme:dark] md:w-[130px]"
           />
         </div>
       </div>
 
-      <div className="flex items-center gap-1.5 pr-2">
+      <div className="flex shrink-0 items-center gap-1.5 pr-1 md:pr-2">
         <Popover open={listOpen} onOpenChange={setListOpen}>
           <PopoverTrigger asChild>
             <button

@@ -1,10 +1,11 @@
-import { ClientOnly, createFileRoute, Link } from "@tanstack/react-router";
-import { lazy, Suspense, useMemo, useState } from "react";
+import { ClientOnly, createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { ConcertDetails } from "@/components/ConcertDetails";
 import { DateFilter } from "@/components/DateFilter";
 import { toConcert, type Concert } from "@/data/concerts";
 import { listConcerts } from "@/lib/concerts.functions";
 import { SITE_URL } from "@/lib/site";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { CalendarDays, Music2 } from "lucide-react";
 import { AuthMenu } from "@/components/AuthMenu";
 
@@ -81,6 +82,21 @@ function Index() {
   const [dateFrom, setDateFrom] = useState<string>("");
   const [dateTo, setDateTo] = useState<string>("");
   const [selected, setSelected] = useState<Concert | null>(null);
+  const navigate = useNavigate();
+  const isMobile = useIsMobile();
+
+  // En celular la ficha sobre el mapa queda ilegible: vamos derecho a la página
+  // del concierto. Sin slug no hay página, así que ahí cae al panel de siempre.
+  const openConcert = useCallback(
+    (c: Concert) => {
+      if (isMobile && c.slug) {
+        navigate({ to: "/concierto/$slug", params: { slug: c.slug } });
+        return;
+      }
+      setSelected(c);
+    },
+    [isMobile, navigate],
+  );
 
   const filtered = useMemo(() => {
     return allConcerts.filter((c) => {
@@ -100,34 +116,43 @@ function Index() {
             <ConcertMap
               concerts={filtered}
               selectedId={selected?.id ?? null}
-              onSelect={(c) => setSelected(c)}
+              onSelect={openConcert}
             />
           </Suspense>
         </ClientOnly>
       </div>
 
-      <header className={`pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between md:p-6 ${selected ? "md:pr-[440px]" : ""}`}>
-        <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border/60 bg-background/85 px-4 py-2 shadow-lg backdrop-blur-md">
+      {/* En celular no entra todo en una fila: el filtro baja a una segunda línea. */}
+      <header
+        className={`pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-wrap items-center gap-2 p-3 md:gap-3 md:p-6 ${selected ? "md:pr-[440px]" : ""}`}
+      >
+        <div className="pointer-events-auto order-1 flex min-w-0 items-center gap-2 rounded-full border border-border/60 bg-background/85 px-3 py-2 shadow-lg backdrop-blur-md md:px-4">
           <div className="rounded-full bg-primary/15 p-1.5">
             <Music2 className="h-4 w-4 text-primary" />
           </div>
-          <h1 className="text-sm font-semibold tracking-tight">
-            misconciertos <span className="hidden text-muted-foreground sm:inline">— Mapa de recitales</span>
+          <h1 className="truncate text-sm font-semibold tracking-tight">
+            misconciertos{" "}
+            <span className="hidden text-muted-foreground sm:inline">— Mapa de recitales</span>
           </h1>
           {allConcerts.length === 0 ? (
-            <span className="text-xs text-muted-foreground">sin conciertos disponibles</span>
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              sin conciertos disponibles
+            </span>
           ) : (
-            <span className="text-xs text-muted-foreground">{allConcerts.length} conciertos</span>
+            <span className="hidden text-xs text-muted-foreground sm:inline">
+              {allConcerts.length} conciertos
+            </span>
           )}
           <Link
             to="/agenda"
-            className="ml-1 inline-flex items-center gap-1 rounded-full bg-accent/60 px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-accent"
+            className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/60 px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-accent"
           >
             <CalendarDays className="h-3 w-3 text-primary" />
             Agenda
           </Link>
         </div>
-        <div className="pointer-events-auto flex items-center gap-3 md:ml-auto">
+        <AuthMenu className="order-2 ml-auto md:order-3 md:ml-0" />
+        <div className="order-3 flex w-full min-w-0 items-center md:order-2 md:ml-auto md:w-auto">
           <DateFilter
             from={dateFrom}
             to={dateTo}
@@ -135,9 +160,8 @@ function Index() {
             onToChange={setDateTo}
             count={filtered.length}
             concerts={filtered}
-            onSelectConcert={(c) => setSelected(c)}
+            onSelectConcert={openConcert}
           />
-          <AuthMenu />
         </div>
       </header>
 

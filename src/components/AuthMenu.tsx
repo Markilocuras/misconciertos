@@ -4,8 +4,9 @@ import { BarChart3, LogOut, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 
-export function AuthMenu() {
+export function AuthMenu({ className }: { className?: string } = {}) {
   const { user, loading } = useAuth();
   const [isAdmin, setIsAdmin] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
@@ -31,14 +32,19 @@ export function AuthMenu() {
 
   if (user) {
     return (
-      <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border/60 bg-background/85 px-3 py-1.5 shadow-lg backdrop-blur-md">
+      <div
+        className={cn(
+          "pointer-events-auto flex shrink-0 items-center gap-2 rounded-full border border-border/60 bg-background/85 px-3 py-1.5 shadow-lg backdrop-blur-md",
+          className,
+        )}
+      >
         <Link
           to="/perfil"
           className="flex items-center gap-2 px-1 text-xs text-foreground transition hover:text-primary"
           title="Mi perfil"
         >
           <UserIcon className="h-3.5 w-3.5 text-primary" />
-          <span className="max-w-[160px] truncate">{username ?? user.email}</span>
+          <span className="hidden max-w-[160px] truncate sm:inline">{username ?? user.email}</span>
         </Link>
         {isAdmin && (
           <Button asChild size="sm" variant="ghost" className="h-7 px-2" title="Estadísticas">
@@ -63,13 +69,24 @@ export function AuthMenu() {
   }
 
   return (
-    <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border/60 bg-background/85 px-2 py-1.5 shadow-lg backdrop-blur-md">
-      <Button asChild size="sm" variant="ghost" className="h-7">
+    <div
+      className={cn(
+        "pointer-events-auto flex shrink-0 items-center gap-2 rounded-full border border-border/60 bg-background/85 px-2 py-1.5 shadow-lg backdrop-blur-md",
+        className,
+      )}
+    >
+      {/* En celular las dos acciones no entran: dejamos una sola puerta de entrada. */}
+      <Button asChild size="sm" className="h-7 sm:hidden">
+        <Link to="/auth" search={{ mode: "login" }}>
+          Entrar
+        </Link>
+      </Button>
+      <Button asChild size="sm" variant="ghost" className="hidden h-7 sm:inline-flex">
         <Link to="/auth" search={{ mode: "login" }}>
           Iniciar sesión
         </Link>
       </Button>
-      <Button asChild size="sm" className="h-7">
+      <Button asChild size="sm" className="hidden h-7 sm:inline-flex">
         <Link to="/auth" search={{ mode: "register" }}>
           Registrarse
         </Link>
