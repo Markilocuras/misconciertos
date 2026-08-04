@@ -1,6 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { Music2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -86,9 +85,7 @@ function AuthPage() {
     <main className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-2xl">
         <Link to="/" className="mb-6 flex items-center gap-2">
-          <div className="rounded-full bg-primary/15 p-1.5">
-            <Music2 className="h-4 w-4 text-primary" />
-          </div>
+          <img src="/logo.svg" alt="" className="h-6 w-6" />
           <span className="text-sm font-semibold">misconciertos</span>
         </Link>
 
