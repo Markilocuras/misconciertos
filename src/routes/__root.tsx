@@ -75,6 +75,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "theme-color", content: "#1a1a24" },
       { title: "misconciertos — Mapa de recitales en Buenos Aires" },
       {
         name: "description",
@@ -109,6 +110,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         rel: "icon",
         type: "image/svg+xml",
         href: "/favicon.svg",
+      },
+      // iOS ignora el SVG al agregar a pantalla de inicio: necesita este PNG.
+      {
+        rel: "apple-touch-icon",
+        href: "/apple-touch-icon.png",
+      },
+      {
+        rel: "manifest",
+        href: "/site.webmanifest",
       },
     ],
     scripts: [

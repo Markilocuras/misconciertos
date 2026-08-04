@@ -6,7 +6,7 @@ import { toConcert, type Concert } from "@/data/concerts";
 import { listConcerts } from "@/lib/concerts.functions";
 import { SITE_URL } from "@/lib/site";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { CalendarDays, Music2 } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import { AuthMenu } from "@/components/AuthMenu";
 
 // Leaflet toca window al importarse: el mapa solo existe en el cliente.
@@ -127,9 +127,7 @@ function Index() {
         className={`pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-wrap items-center gap-2 p-3 md:gap-3 md:p-6 ${selected ? "md:pr-[440px]" : ""}`}
       >
         <div className="pointer-events-auto order-1 flex min-w-0 items-center gap-2 rounded-full border border-border/60 bg-background/85 px-3 py-2 shadow-lg backdrop-blur-md md:px-4">
-          <div className="rounded-full bg-primary/15 p-1.5">
-            <Music2 className="h-4 w-4 text-primary" />
-          </div>
+          <img src="/logo.svg" alt="" className="h-7 w-7 shrink-0" />
           <h1 className="truncate text-sm font-semibold tracking-tight">
             misconciertos{" "}
             <span className="hidden text-muted-foreground sm:inline">— Mapa de recitales</span>

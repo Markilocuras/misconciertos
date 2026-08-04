@@ -1,6 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="8 8 48 48">
-  <!-- Mismo pin que logo.svg, con el viewBox ajustado al alto del pin para que
-       llene la pestaña: a 16px cada unidad de padding se come mucho. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="misconciertos">
+  <!-- Pin: círculo de radio 18 centrado en (32, 27.55) + las dos tangentes que
+       bajan a la punta en (32, 54.45). Los puntos de tangencia salen de
+       arccos(r/d) con d = 26.9, por eso los 18.62 / 45.38. -->
   <defs>
     <linearGradient id="mc-pin" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#fbb040"/>
