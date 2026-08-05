@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,6 +41,7 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
+  const [notify, setNotify] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -57,7 +59,10 @@ function AuthPage() {
           email,
           password,
           options: {
-            data: { username: username.trim() },
+            // Todavía no hay sesión (falta confirmar el mail), así que la
+            // preferencia viaja acá y la materializa el trigger
+            // on_auth_user_created_concert_digest.
+            data: { username: username.trim(), notify_new_concerts: notify },
             emailRedirectTo: `${window.location.origin}/`,
           },
         });
@@ -139,6 +144,21 @@ function AuthPage() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+          {isRegister && (
+            <label className="flex cursor-pointer items-start gap-2 rounded-lg bg-accent/30 p-3 text-sm">
+              <Checkbox
+                checked={notify}
+                onCheckedChange={(checked) => setNotify(checked === true)}
+                className="mt-0.5"
+              />
+              <span>
+                Avisame por mail cuando haya recitales nuevos
+                <span className="block text-xs text-muted-foreground">
+                  Un solo mail con los shows que se suman. Lo podés apagar cuando quieras.
+                </span>
+              </span>
+            </label>
+          )}
           <Button type="submit" className="w-full" disabled={submitting}>
             {submitting
               ? "Procesando..."

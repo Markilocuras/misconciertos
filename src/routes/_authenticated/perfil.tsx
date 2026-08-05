@@ -1,6 +1,16 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowLeft, Clock, Heart, MapPin, MessageCircle, User as UserIcon, X } from "lucide-react";
+import {
+  ArrowLeft,
+  BellRing,
+  Clock,
+  Heart,
+  MapPin,
+  MessageCircle,
+  User as UserIcon,
+  X,
+} from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { formatConcertDate, FALLBACK_IMAGES } from "@/data/concerts";
@@ -43,6 +53,8 @@ function ProfilePage() {
   const [saved, setSaved] = useState<SavedRow[]>([]);
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [notify, setNotify] = useState(false);
+  const [savingNotify, setSavingNotify] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -60,11 +72,17 @@ function ProfilePage() {
         .select("id, artist, body, created_at")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false }),
-    ]).then(([profileRes, savedRes, commentsRes]) => {
+      supabase
+        .from("concert_digest_subscriptions")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]).then(([profileRes, savedRes, commentsRes, digestRes]) => {
       if (cancelled) return;
       setUsername(profileRes.data?.username ?? null);
       setSaved((savedRes.data ?? []) as SavedRow[]);
       setComments((commentsRes.data ?? []) as CommentRow[]);
+      setNotify(Boolean(digestRes.data));
       setLoading(false);
     });
     return () => {
@@ -79,6 +97,21 @@ function ProfilePage() {
       return;
     }
     setSaved((prev) => prev.filter((r) => r.id !== rowId));
+  };
+
+  const toggleNotify = async (next: boolean) => {
+    if (!user) return;
+    setSavingNotify(true);
+    const { error } = next
+      ? await supabase.from("concert_digest_subscriptions").insert({ user_id: user.id })
+      : await supabase.from("concert_digest_subscriptions").delete().eq("user_id", user.id);
+    setSavingNotify(false);
+    if (error) {
+      toast.error("No se pudo guardar la preferencia, probá de nuevo");
+      return;
+    }
+    setNotify(next);
+    toast.success(next ? "Listo, te vamos a avisar" : "No te avisamos más");
   };
 
   return (
@@ -100,6 +133,26 @@ function ProfilePage() {
             <p className="text-sm text-muted-foreground">{user?.email}</p>
           </div>
         </div>
+
+        <section className="mb-8">
+          <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-primary">
+            <BellRing className="h-4 w-4" /> Avisos por mail
+          </h2>
+          <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-border bg-card p-4">
+            <span className="text-sm">
+              Avisame cuando haya recitales nuevos
+              <span className="block text-xs text-muted-foreground">
+                Un solo mail con los shows que se suman, a {user?.email}.
+              </span>
+            </span>
+            <Switch
+              checked={notify}
+              onCheckedChange={toggleNotify}
+              disabled={loading || savingNotify}
+              aria-label="Avisos por mail de recitales nuevos"
+            />
+          </label>
+        </section>
 
         <section className="mb-8">
           <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-primary">

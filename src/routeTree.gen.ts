@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as Google7442d18f9dbf8186DothtmlRouteImport } from './routes/google7442d18f9dbf8186[.]html'
+import { Route as BajaRouteImport } from './routes/baja'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AgendaRouteImport } from './routes/agenda'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
@@ -18,6 +19,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ConciertoSlugRouteImport } from './routes/concierto.$slug'
 import { Route as AuthenticatedPerfilRouteImport } from './routes/_authenticated/perfil'
 import { Route as AuthenticatedAdminStatsRouteImport } from './routes/_authenticated/admin.stats'
+import { Route as ApiPublicHooksUnsubscribeDigestRouteImport } from './routes/api/public/hooks/unsubscribe-digest'
 import { Route as ApiPublicHooksTrackClickRouteImport } from './routes/api/public/hooks/track-click'
 import { Route as ApiPublicHooksIngestConcertsRouteImport } from './routes/api/public/hooks/ingest-concerts'
 
@@ -32,6 +34,11 @@ const Google7442d18f9dbf8186DothtmlRoute =
     path: '/google7442d18f9dbf8186.html',
     getParentRoute: () => rootRouteImport,
   } as any)
+const BajaRoute = BajaRouteImport.update({
+  id: '/baja',
+  path: '/baja',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
@@ -66,6 +73,12 @@ const AuthenticatedAdminStatsRoute = AuthenticatedAdminStatsRouteImport.update({
   path: '/admin/stats',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicHooksUnsubscribeDigestRoute =
+  ApiPublicHooksUnsubscribeDigestRouteImport.update({
+    id: '/api/public/hooks/unsubscribe-digest',
+    path: '/api/public/hooks/unsubscribe-digest',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksTrackClickRoute =
   ApiPublicHooksTrackClickRouteImport.update({
     id: '/api/public/hooks/track-click',
@@ -83,6 +96,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/auth': typeof AuthRoute
+  '/baja': typeof BajaRoute
   '/google7442d18f9dbf8186.html': typeof Google7442d18f9dbf8186DothtmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/perfil': typeof AuthenticatedPerfilRoute
@@ -90,11 +104,13 @@ export interface FileRoutesByFullPath {
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
   '/api/public/hooks/track-click': typeof ApiPublicHooksTrackClickRoute
+  '/api/public/hooks/unsubscribe-digest': typeof ApiPublicHooksUnsubscribeDigestRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/auth': typeof AuthRoute
+  '/baja': typeof BajaRoute
   '/google7442d18f9dbf8186.html': typeof Google7442d18f9dbf8186DothtmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/perfil': typeof AuthenticatedPerfilRoute
@@ -102,6 +118,7 @@ export interface FileRoutesByTo {
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
   '/api/public/hooks/track-click': typeof ApiPublicHooksTrackClickRoute
+  '/api/public/hooks/unsubscribe-digest': typeof ApiPublicHooksUnsubscribeDigestRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -109,6 +126,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/agenda': typeof AgendaRoute
   '/auth': typeof AuthRoute
+  '/baja': typeof BajaRoute
   '/google7442d18f9dbf8186.html': typeof Google7442d18f9dbf8186DothtmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
@@ -116,6 +134,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
   '/api/public/hooks/track-click': typeof ApiPublicHooksTrackClickRoute
+  '/api/public/hooks/unsubscribe-digest': typeof ApiPublicHooksUnsubscribeDigestRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -123,6 +142,7 @@ export interface FileRouteTypes {
     | '/'
     | '/agenda'
     | '/auth'
+    | '/baja'
     | '/google7442d18f9dbf8186.html'
     | '/sitemap.xml'
     | '/perfil'
@@ -130,11 +150,13 @@ export interface FileRouteTypes {
     | '/admin/stats'
     | '/api/public/hooks/ingest-concerts'
     | '/api/public/hooks/track-click'
+    | '/api/public/hooks/unsubscribe-digest'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/agenda'
     | '/auth'
+    | '/baja'
     | '/google7442d18f9dbf8186.html'
     | '/sitemap.xml'
     | '/perfil'
@@ -142,12 +164,14 @@ export interface FileRouteTypes {
     | '/admin/stats'
     | '/api/public/hooks/ingest-concerts'
     | '/api/public/hooks/track-click'
+    | '/api/public/hooks/unsubscribe-digest'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/agenda'
     | '/auth'
+    | '/baja'
     | '/google7442d18f9dbf8186.html'
     | '/sitemap.xml'
     | '/_authenticated/perfil'
@@ -155,6 +179,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/stats'
     | '/api/public/hooks/ingest-concerts'
     | '/api/public/hooks/track-click'
+    | '/api/public/hooks/unsubscribe-digest'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -162,11 +187,13 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AgendaRoute: typeof AgendaRoute
   AuthRoute: typeof AuthRoute
+  BajaRoute: typeof BajaRoute
   Google7442d18f9dbf8186DothtmlRoute: typeof Google7442d18f9dbf8186DothtmlRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ConciertoSlugRoute: typeof ConciertoSlugRoute
   ApiPublicHooksIngestConcertsRoute: typeof ApiPublicHooksIngestConcertsRoute
   ApiPublicHooksTrackClickRoute: typeof ApiPublicHooksTrackClickRoute
+  ApiPublicHooksUnsubscribeDigestRoute: typeof ApiPublicHooksUnsubscribeDigestRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -183,6 +210,13 @@ declare module '@tanstack/react-router' {
       path: '/google7442d18f9dbf8186.html'
       fullPath: '/google7442d18f9dbf8186.html'
       preLoaderRoute: typeof Google7442d18f9dbf8186DothtmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/baja': {
+      id: '/baja'
+      path: '/baja'
+      fullPath: '/baja'
+      preLoaderRoute: typeof BajaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/auth': {
@@ -234,6 +268,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminStatsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/hooks/unsubscribe-digest': {
+      id: '/api/public/hooks/unsubscribe-digest'
+      path: '/api/public/hooks/unsubscribe-digest'
+      fullPath: '/api/public/hooks/unsubscribe-digest'
+      preLoaderRoute: typeof ApiPublicHooksUnsubscribeDigestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/track-click': {
       id: '/api/public/hooks/track-click'
       path: '/api/public/hooks/track-click'
@@ -269,11 +310,13 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AgendaRoute: AgendaRoute,
   AuthRoute: AuthRoute,
+  BajaRoute: BajaRoute,
   Google7442d18f9dbf8186DothtmlRoute: Google7442d18f9dbf8186DothtmlRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ConciertoSlugRoute: ConciertoSlugRoute,
   ApiPublicHooksIngestConcertsRoute: ApiPublicHooksIngestConcertsRoute,
   ApiPublicHooksTrackClickRoute: ApiPublicHooksTrackClickRoute,
+  ApiPublicHooksUnsubscribeDigestRoute: ApiPublicHooksUnsubscribeDigestRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

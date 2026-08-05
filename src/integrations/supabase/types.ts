@@ -35,6 +35,24 @@ export type Database = {
         }
         Relationships: []
       }
+      concert_digest_subscriptions: {
+        Row: {
+          created_at: string
+          unsubscribe_token: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          unsubscribe_token?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          unsubscribe_token?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       artist_comments: {
         Row: {
           artist: string
@@ -276,7 +294,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      list_concert_digest_recipients: {
+        Args: never
+        Returns: { email: string; unsubscribe_token: string }[]
+      }
       trigger_concert_ingest: { Args: never; Returns: undefined }
+      unsubscribe_concert_digest: {
+        Args: { token: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "user"
