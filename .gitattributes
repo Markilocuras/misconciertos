@@ -1,0 +1,15 @@
+# El repo guarda y checkoutea todo con LF, también en Windows. Sin esto, con
+# core.autocrlf=true git deja CRLF en el working tree y Prettier (endOfLine: "lf")
+# marca un error por línea en cada archivo.
+* text=auto eol=lf
+
+# Binarios: que git no toque los saltos de línea.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.pdf binary

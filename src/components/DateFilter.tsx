@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Calendar, X } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { Concert } from "@/data/concerts";
+import { formatConcertDate, type Concert } from "@/data/concerts";
 
 type Props = {
   from: string;
@@ -100,8 +100,8 @@ export function DateFilter({
                         className="flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left text-sm transition hover:bg-accent"
                       >
                         <span className="font-medium">{c.artist || c.title}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {c.venue} · {c.date}
+                        <span className="text-xs capitalize text-muted-foreground">
+                          {c.venue} · {formatConcertDate(c.date)}
                         </span>
                       </button>
                     ))}
