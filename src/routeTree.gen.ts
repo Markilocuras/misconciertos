@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as Google7442d18f9dbf8186DothtmlRouteImport } from './routes/google7442d18f9dbf8186[.]html'
+import { Route as ConciertosRouteImport } from './routes/conciertos'
 import { Route as BajaRouteImport } from './routes/baja'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AgendaRouteImport } from './routes/agenda'
@@ -34,6 +35,11 @@ const Google7442d18f9dbf8186DothtmlRoute =
     path: '/google7442d18f9dbf8186.html',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ConciertosRoute = ConciertosRouteImport.update({
+  id: '/conciertos',
+  path: '/conciertos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BajaRoute = BajaRouteImport.update({
   id: '/baja',
   path: '/baja',
@@ -97,6 +103,7 @@ export interface FileRoutesByFullPath {
   '/agenda': typeof AgendaRoute
   '/auth': typeof AuthRoute
   '/baja': typeof BajaRoute
+  '/conciertos': typeof ConciertosRoute
   '/google7442d18f9dbf8186.html': typeof Google7442d18f9dbf8186DothtmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/perfil': typeof AuthenticatedPerfilRoute
@@ -111,6 +118,7 @@ export interface FileRoutesByTo {
   '/agenda': typeof AgendaRoute
   '/auth': typeof AuthRoute
   '/baja': typeof BajaRoute
+  '/conciertos': typeof ConciertosRoute
   '/google7442d18f9dbf8186.html': typeof Google7442d18f9dbf8186DothtmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/perfil': typeof AuthenticatedPerfilRoute
@@ -127,6 +135,7 @@ export interface FileRoutesById {
   '/agenda': typeof AgendaRoute
   '/auth': typeof AuthRoute
   '/baja': typeof BajaRoute
+  '/conciertos': typeof ConciertosRoute
   '/google7442d18f9dbf8186.html': typeof Google7442d18f9dbf8186DothtmlRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
@@ -143,6 +152,7 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/auth'
     | '/baja'
+    | '/conciertos'
     | '/google7442d18f9dbf8186.html'
     | '/sitemap.xml'
     | '/perfil'
@@ -157,6 +167,7 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/auth'
     | '/baja'
+    | '/conciertos'
     | '/google7442d18f9dbf8186.html'
     | '/sitemap.xml'
     | '/perfil'
@@ -172,6 +183,7 @@ export interface FileRouteTypes {
     | '/agenda'
     | '/auth'
     | '/baja'
+    | '/conciertos'
     | '/google7442d18f9dbf8186.html'
     | '/sitemap.xml'
     | '/_authenticated/perfil'
@@ -188,6 +200,7 @@ export interface RootRouteChildren {
   AgendaRoute: typeof AgendaRoute
   AuthRoute: typeof AuthRoute
   BajaRoute: typeof BajaRoute
+  ConciertosRoute: typeof ConciertosRoute
   Google7442d18f9dbf8186DothtmlRoute: typeof Google7442d18f9dbf8186DothtmlRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ConciertoSlugRoute: typeof ConciertoSlugRoute
@@ -210,6 +223,13 @@ declare module '@tanstack/react-router' {
       path: '/google7442d18f9dbf8186.html'
       fullPath: '/google7442d18f9dbf8186.html'
       preLoaderRoute: typeof Google7442d18f9dbf8186DothtmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/conciertos': {
+      id: '/conciertos'
+      path: '/conciertos'
+      fullPath: '/conciertos'
+      preLoaderRoute: typeof ConciertosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/baja': {
@@ -311,6 +331,7 @@ const rootRouteChildren: RootRouteChildren = {
   AgendaRoute: AgendaRoute,
   AuthRoute: AuthRoute,
   BajaRoute: BajaRoute,
+  ConciertosRoute: ConciertosRoute,
   Google7442d18f9dbf8186DothtmlRoute: Google7442d18f9dbf8186DothtmlRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ConciertoSlugRoute: ConciertoSlugRoute,
