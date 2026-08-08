@@ -4,79 +4,85 @@ import { toConcert, formatConcertDate, type Concert } from "@/data/concerts";
 import { listConcerts } from "@/lib/concerts.functions";
 import { SITE_URL } from "@/lib/site";
 
-const WEEK_DAYS = 7;
+// La cartelera completa: es la única página que linkea a *todos* los conciertos.
+// El mapa de la home no sirve para eso (Leaflet dibuja los pins en el cliente,
+// así que para un crawler la home no tiene un solo link a /concierto/...) y la
+// agenda solo cubre 7 días. Sin esta página las fichas quedan huérfanas y Google
+// las deja en "Descubierta: actualmente sin indexar".
 
-function plusDays(date: string, days: number): string {
-  const d = new Date(`${date}T00:00:00`);
-  d.setDate(d.getDate() + days);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+function monthKey(date: string): string {
+  return date.slice(0, 7);
 }
 
-function shortDate(date: string): string {
-  return new Date(`${date}T00:00`).toLocaleDateString("es-AR", {
-    day: "numeric",
+function monthLabel(key: string): string {
+  return new Date(`${key}-01T00:00`).toLocaleDateString("es-AR", {
     month: "long",
+    year: "numeric",
   });
 }
 
-function agendaJsonLd(concerts: Concert[]): string {
+function carteleraJsonLd(concerts: Concert[]): string {
   return JSON.stringify({
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: "Agenda de conciertos de la semana en Buenos Aires",
+    name: "Cartelera de recitales en Buenos Aires",
+    numberOfItems: concerts.length,
     itemListElement: concerts.map((c, i) => ({
       "@type": "ListItem",
       position: i + 1,
-      url: c.slug ? `${SITE_URL}/concierto/${c.slug}` : c.buyUrl,
+      name: c.artist || c.title,
+      url: `${SITE_URL}/concierto/${c.slug}`,
     })),
   });
 }
 
-export const Route = createFileRoute("/agenda")({
+export const Route = createFileRoute("/conciertos")({
   loader: async () => {
     const res = await listConcerts();
-    const today = new Date().toISOString().slice(0, 10);
-    const until = plusDays(today, WEEK_DAYS);
     const concerts = (res.concerts ?? [])
       .map(toConcert)
-      .filter((c): c is Concert => c !== null && c.date >= today && c.date < until);
-    return { concerts, today, until };
+      .filter((c): c is Concert => c !== null && c.slug !== "");
+    return { concerts };
   },
   head: ({ loaderData }) => {
-    const from = loaderData ? shortDate(loaderData.today) : "";
-    const to = loaderData ? shortDate(plusDays(loaderData.until, -1)) : "";
-    const title = `Agenda de la semana en Buenos Aires (${from} al ${to}) — misconciertos`;
-    const description = loaderData?.concerts.length
-      ? `${loaderData.concerts.length} recitales esta semana en Buenos Aires: ${[...new Set(loaderData.concerts.map((c) => c.artist || c.title))].slice(0, 5).join(", ")} y más. Fechas, venues y entradas.`
-      : "Los recitales de esta semana en Buenos Aires: fechas, venues y entradas.";
+    const count = loaderData?.concerts.length ?? 0;
+    const title = "Todos los recitales en Buenos Aires — misconciertos";
+    const description = count
+      ? `Cartelera completa: ${count} recitales y conciertos próximos en Buenos Aires, con fecha, venue, precio y entradas.`
+      : "Cartelera completa de recitales y conciertos próximos en Buenos Aires, con fecha, venue, precio y entradas.";
     return {
       meta: [
         { title },
         { name: "description", content: description },
         { property: "og:title", content: title },
         { property: "og:description", content: description },
-        { property: "og:url", content: `${SITE_URL}/agenda` },
+        { property: "og:url", content: `${SITE_URL}/conciertos` },
       ],
-      links: [{ rel: "canonical", href: `${SITE_URL}/agenda` }],
-      scripts: loaderData?.concerts.length
-        ? [{ type: "application/ld+json", children: agendaJsonLd(loaderData.concerts) }]
+      links: [{ rel: "canonical", href: `${SITE_URL}/conciertos` }],
+      scripts: count
+        ? [
+            {
+              type: "application/ld+json",
+              children: carteleraJsonLd(loaderData!.concerts),
+            },
+          ]
         : [],
     };
   },
-  component: AgendaPage,
+  component: CarteleraPage,
 });
 
-function AgendaPage() {
+function CarteleraPage() {
   const { concerts } = Route.useLoaderData();
 
-  const byDate = new Map<string, Concert[]>();
+  const byMonth = new Map<string, Concert[]>();
   for (const c of concerts) {
-    const list = byDate.get(c.date) ?? [];
+    const key = monthKey(c.date);
+    const list = byMonth.get(key) ?? [];
     list.push(c);
-    byDate.set(c.date, list);
+    byMonth.set(key, list);
   }
-  const days = [...byDate.keys()].sort();
+  const months = [...byMonth.keys()].sort();
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -89,40 +95,34 @@ function AgendaPage() {
             <ArrowLeft className="h-4 w-4" /> Ver en el mapa
           </Link>
           <Link
-            to="/conciertos"
+            to="/agenda"
             className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground"
           >
-            <CalendarDays className="h-4 w-4" /> Ver todos los recitales
+            <CalendarDays className="h-4 w-4" /> Agenda de la semana
           </Link>
         </div>
 
-        <div className="mt-4 mb-6 flex items-center gap-3">
-          <div className="rounded-full bg-primary/15 p-2">
-            <CalendarDays className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">Agenda de la semana</h1>
-            <p className="text-sm text-muted-foreground">
-              {concerts.length
-                ? `${concerts.length} recitales en Buenos Aires en los próximos 7 días`
-                : "Sin recitales anunciados para los próximos 7 días"}
-            </p>
-          </div>
+        <div className="mt-4 mb-6">
+          <h1 className="text-2xl font-bold">Todos los recitales en Buenos Aires</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {concerts.length
+              ? `${concerts.length} conciertos próximos, ordenados por fecha`
+              : "Sin conciertos anunciados por ahora"}
+          </p>
         </div>
 
-        <div className="space-y-6">
-          {days.map((date) => (
-            <section key={date}>
-              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-primary capitalize">
-                {formatConcertDate(date)}
+        <div className="space-y-8">
+          {months.map((month) => (
+            <section key={month}>
+              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-primary capitalize">
+                {monthLabel(month)}
               </h2>
               <ul className="space-y-2">
-                {(byDate.get(date) ?? []).map((c) => (
+                {(byMonth.get(month) ?? []).map((c) => (
                   <li key={c.id}>
                     <Link
                       to="/concierto/$slug"
                       params={{ slug: c.slug }}
-                      disabled={!c.slug}
                       className="flex items-center gap-4 rounded-xl border border-border bg-card p-3 transition hover:border-primary/40"
                     >
                       <img
@@ -133,7 +133,10 @@ function AgendaPage() {
                       />
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium">{c.artist || c.title}</p>
-                        <p className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <p className="flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+                          <span className="inline-flex items-center gap-1 capitalize">
+                            <CalendarDays className="h-3 w-3" /> {formatConcertDate(c.date)}
+                          </span>
                           <span className="inline-flex items-center gap-1">
                             <MapPin className="h-3 w-3" /> {c.venue}
                           </span>

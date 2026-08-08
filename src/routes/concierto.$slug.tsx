@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { Calendar, Clock, Map as MapIcon, MapPin } from "lucide-react";
+import { Calendar, CalendarDays, Clock, Map as MapIcon, MapPin } from "lucide-react";
 import { toConcert, formatConcertDate, type Concert } from "@/data/concerts";
-import { getConcertBySlug } from "@/lib/concerts.functions";
+import { getConcertBySlug, type ConcertLinkRow } from "@/lib/concerts.functions";
 import { ArtistComments } from "@/components/ArtistComments";
 import { ArtistAlert } from "@/components/ArtistAlert";
 import { AddToCalendar } from "@/components/AddToCalendar";
@@ -53,7 +53,7 @@ export const Route = createFileRoute("/concierto/$slug")({
     const res = await getConcertBySlug({ data: params.slug });
     const concert = res.concert ? toConcert(res.concert) : null;
     if (!concert) throw notFound();
-    return { concert, slug: params.slug };
+    return { concert, slug: params.slug, related: res.related };
   },
   head: ({ loaderData }) => {
     if (!loaderData) return {};
@@ -78,8 +78,47 @@ export const Route = createFileRoute("/concierto/$slug")({
   component: ConcertPage,
 });
 
+// Lista de links a otras fichas. Es lo que conecta las páginas de concierto
+// entre sí: hasta que existió, la única forma de llegar a una era el sitemap.
+function RelatedList({ title, concerts }: { title: string; concerts: ConcertLinkRow[] }) {
+  if (!concerts.length) return null;
+
+  return (
+    <section className="mt-6">
+      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-primary">{title}</h2>
+      <ul className="space-y-2">
+        {concerts.map((c) => (
+          <li key={c.id}>
+            <Link
+              to="/concierto/$slug"
+              params={{ slug: c.slug! }}
+              className="flex items-center gap-3 rounded-xl border border-border bg-card p-3 transition hover:border-primary/40"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{c.artist || c.title}</p>
+                <p className="flex flex-wrap items-center gap-x-3 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin className="h-3 w-3" /> {c.venue}
+                  </span>
+                  {c.date && (
+                    <span className="inline-flex items-center gap-1 capitalize">
+                      <Calendar className="h-3 w-3" /> {formatConcertDate(c.date)}
+                    </span>
+                  )}
+                </p>
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function ConcertPage() {
-  const { concert } = Route.useLoaderData();
+  const { concert, related } = Route.useLoaderData();
+  const sameVenue = related.filter((c) => c.venue && c.venue === concert.venue);
+  const otherVenues = related.filter((c) => !c.venue || c.venue !== concert.venue);
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -146,6 +185,27 @@ function ConcertPage() {
             {concert.artist && <ArtistAlert artist={concert.artist} />}
             {concert.artist && <ArtistComments artist={concert.artist} />}
           </div>
+        </div>
+
+        <RelatedList
+          title={concert.venue ? `Más recitales en ${concert.venue}` : "Más recitales"}
+          concerts={sameVenue}
+        />
+        <RelatedList title="Otros recitales próximos en Buenos Aires" concerts={otherVenues} />
+
+        <div className="mt-6 flex flex-wrap items-center gap-4 border-t border-border pt-4 text-sm">
+          <Link
+            to="/conciertos"
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <CalendarDays className="h-4 w-4" /> Ver todos los recitales
+          </Link>
+          <Link
+            to="/agenda"
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <Clock className="h-4 w-4" /> Agenda de la semana
+          </Link>
         </div>
       </div>
     </main>
