@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Concert } from "@/data/concerts";
+import { trackEvent } from "@/lib/analytics";
 
 // Preferencia local de quien ya vio el aviso y no lo quiere volver a ver.
 // Solo se lee/escribe dentro de handlers, nunca en render, para no romper la hidratación.
@@ -61,6 +62,9 @@ export function BuyButton({ concert }: { concert: Concert }) {
 
   // La redirección se cuenta acá: una fila en concert_clicks == una salida real
   // al sitio de venta. Si cancelan el aviso no se registra nada.
+  //
+  // El mismo click va también a GA: concert_clicks guarda el dato crudo y sirve
+  // para /admin/stats, GA lo cruza con la fuente de tráfico de la sesión.
   function redirect() {
     if (!safeUrl) return;
     try {
@@ -73,6 +77,13 @@ export function BuyButton({ concert }: { concert: Concert }) {
     } catch {
       // ignore
     }
+    trackEvent("buy_click", {
+      concert_id: concert.id,
+      concert_title: concert.title,
+      artist: concert.artist,
+      venue: concert.venue,
+      link_domain: host,
+    });
     window.open(safeUrl, "_blank", "noopener,noreferrer");
   }
 
