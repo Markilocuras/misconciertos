@@ -10,6 +10,8 @@ import {
 
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
+import { useAnalytics } from "@/hooks/use-analytics";
+import { GA_HEAD_SCRIPTS } from "@/lib/analytics";
 import { SITE_URL } from "@/lib/site";
 
 
@@ -121,7 +123,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         href: "/site.webmanifest",
       },
     ],
+    // Ojo: los `scripts` de head() terminan en el <head> (router-core los mapea
+    // a headScripts), no al final del <body>. Por eso gtag va primero acá.
     scripts: [
+      ...GA_HEAD_SCRIPTS,
       {
         type: "application/ld+json",
         children: JSON.stringify({
@@ -165,6 +170,7 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useAnalytics();
 
   return (
     <QueryClientProvider client={queryClient}>

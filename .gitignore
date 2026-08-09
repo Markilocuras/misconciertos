@@ -31,6 +31,12 @@ supabase/.temp/
 # is only a local artifact from running npm on machines without bun installed.
 package-lock.json
 
+# Claude Code: launch.json describe cómo levantar el dev server y le sirve a
+# cualquiera que clone el repo. El resto (settings.local.json, cachés de sesión)
+# son permisos y estado de una máquina puntual.
+.claude/*
+!.claude/launch.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
