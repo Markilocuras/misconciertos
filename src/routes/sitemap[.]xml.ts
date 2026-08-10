@@ -18,6 +18,7 @@ export const Route = createFileRoute("/sitemap.xml")({
         // Only public, indexable routes. /auth and /admin/* are noindex.
         const entries: SitemapEntry[] = [
           { path: "/", lastmod: today, changefreq: "daily", priority: "1.0" },
+          { path: "/conciertos", lastmod: today, changefreq: "daily", priority: "0.9" },
           { path: "/agenda", lastmod: today, changefreq: "daily", priority: "0.8" },
           { path: "/terminos", changefreq: "yearly", priority: "0.2" },
           { path: "/privacidad", changefreq: "yearly", priority: "0.2" },

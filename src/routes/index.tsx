@@ -7,7 +7,7 @@ import { toConcert, type Concert } from "@/data/concerts";
 import { listConcerts } from "@/lib/concerts.functions";
 import { SITE_URL } from "@/lib/site";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, ListMusic } from "lucide-react";
 import { AuthMenu } from "@/components/AuthMenu";
 
 // Leaflet toca window al importarse: el mapa solo existe en el cliente.
@@ -150,6 +150,16 @@ function Index() {
           >
             <CalendarDays className="h-3 w-3 text-primary" />
             Agenda
+          </Link>
+          {/* Para un crawler el mapa no existe (los pins los dibuja Leaflet en el
+              cliente): este link es el único camino desde la home hacia las
+              fichas de cada concierto. */}
+          <Link
+            to="/conciertos"
+            className="inline-flex shrink-0 items-center gap-1 rounded-full bg-accent/60 px-2.5 py-1 text-xs font-medium text-foreground transition hover:bg-accent"
+          >
+            <ListMusic className="h-3 w-3 text-primary" />
+            Cartelera
           </Link>
         </div>
         <AuthMenu className="order-2 ml-auto md:order-3 md:ml-0" />
