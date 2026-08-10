@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, CalendarDays, Clock, MapPin } from "lucide-react";
+import { SiteFooter } from "@/components/SiteFooter";
 import { toConcert, formatConcertDate, type Concert } from "@/data/concerts";
 import { listConcerts } from "@/lib/concerts.functions";
 import { SITE_URL } from "@/lib/site";
@@ -148,6 +149,8 @@ function AgendaPage() {
             </section>
           ))}
         </div>
+
+        <SiteFooter />
       </div>
     </main>
   );

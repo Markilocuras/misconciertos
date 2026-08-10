@@ -2,6 +2,7 @@ import { ClientOnly, createFileRoute, Link, useNavigate } from "@tanstack/react-
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { ConcertDetails } from "@/components/ConcertDetails";
 import { DateFilter } from "@/components/DateFilter";
+import { SiteFooterOverlay } from "@/components/SiteFooter";
 import { toConcert, type Concert } from "@/data/concerts";
 import { listConcerts } from "@/lib/concerts.functions";
 import { SITE_URL } from "@/lib/site";
@@ -31,7 +32,11 @@ function concertsJsonLd(concerts: Concert[]): string {
           "@type": "Place",
           name: c.venue || "Buenos Aires",
           geo: { "@type": "GeoCoordinates", latitude: c.lat, longitude: c.lng },
-          address: { "@type": "PostalAddress", addressLocality: "Buenos Aires", addressCountry: "AR" },
+          address: {
+            "@type": "PostalAddress",
+            addressLocality: "Buenos Aires",
+            addressCountry: "AR",
+          },
         },
         ...(c.artist ? { performer: { "@type": "MusicGroup", name: c.artist } } : {}),
         ...(c.image ? { image: [c.image] } : {}),
@@ -44,9 +49,7 @@ function concertsJsonLd(concerts: Concert[]): string {
 export const Route = createFileRoute("/")({
   loader: async () => {
     const res = await listConcerts();
-    const concerts = (res.concerts ?? [])
-      .map(toConcert)
-      .filter((c): c is Concert => c !== null);
+    const concerts = (res.concerts ?? []).map(toConcert).filter((c): c is Concert => c !== null);
     return { concerts };
   },
   head: ({ loaderData }) => ({
@@ -162,6 +165,12 @@ function Index() {
           />
         </div>
       </header>
+
+      {/* En celular sube por encima de la atribución de OSM, y si hay un show
+          abierto el panel tapa la esquina, así que ahí se esconde. */}
+      <SiteFooterOverlay
+        className={`absolute bottom-8 left-3 z-10 md:bottom-3 ${selected ? "hidden md:flex" : "flex"}`}
+      />
 
       {selected && (
         <>
