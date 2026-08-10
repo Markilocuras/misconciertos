@@ -135,12 +135,14 @@ function Index() {
             misconciertos{" "}
             <span className="hidden text-muted-foreground sm:inline">— Mapa de recitales</span>
           </h1>
+          {/* El contador también lo muestra DateFilter: acá solo aparece cuando
+              sobra ancho, para no empujar al AuthMenu fuera de la primera fila. */}
           {allConcerts.length === 0 ? (
-            <span className="hidden text-xs text-muted-foreground sm:inline">
+            <span className="hidden text-xs text-muted-foreground 2xl:inline">
               sin conciertos disponibles
             </span>
           ) : (
-            <span className="hidden text-xs text-muted-foreground sm:inline">
+            <span className="hidden text-xs text-muted-foreground 2xl:inline">
               {allConcerts.length} conciertos
             </span>
           )}
@@ -162,8 +164,12 @@ function Index() {
             Cartelera
           </Link>
         </div>
-        <AuthMenu className="order-2 ml-auto md:order-3 md:ml-0" />
-        <div className="order-3 flex w-full min-w-0 items-center md:order-2 md:ml-auto md:w-auto">
+        <AuthMenu className="order-2 ml-auto xl:order-3 xl:ml-0" />
+        {/* Hasta xl el filtro se lleva una fila entera y el AuthMenu se queda
+            arriba a la derecha; recién con ancho de sobra entran los tres en la
+            misma fila. Cuando el filtro competía por lugar antes de eso, el que
+            caía a la segunda fila era el AuthMenu. */}
+        <div className="order-3 flex w-full min-w-0 items-center xl:order-2 xl:ml-auto xl:w-auto">
           <DateFilter
             from={dateFrom}
             to={dateTo}

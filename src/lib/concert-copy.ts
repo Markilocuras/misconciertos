@@ -29,6 +29,11 @@ export function formatDayMonth(date: string): string {
   });
 }
 
+/** "17 de agosto 2026" — para el <title>, donde el año sí se busca. */
+export function formatDayMonthYear(date: string): string {
+  return `${formatDayMonth(date)} ${date.slice(0, 4)}`;
+}
+
 function joinEs(items: string[]): string {
   if (items.length <= 1) return items[0] ?? "";
   return `${items.slice(0, -1).join(", ")} y ${items[items.length - 1]}`;

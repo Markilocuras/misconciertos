@@ -1,7 +1,13 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { Calendar, CalendarDays, Clock, Map as MapIcon, MapPin } from "lucide-react";
 import { toConcert, formatConcertDate, type Concert } from "@/data/concerts";
-import { concertSummary, realDescription } from "@/lib/concert-copy";
+import {
+  concertSummary,
+  formatDateList,
+  formatDateLong,
+  formatDayMonthYear,
+  realDescription,
+} from "@/lib/concert-copy";
 import { getConcertBySlug, type ConcertLinkRow } from "@/lib/concerts.functions";
 import { ArtistComments } from "@/components/ArtistComments";
 import { ArtistAlert } from "@/components/ArtistAlert";
@@ -74,10 +80,19 @@ export const Route = createFileRoute("/concierto/$slug")({
   head: ({ loaderData }) => {
     if (!loaderData) return {};
     const { concert: c, run, canonicalSlug } = loaderData;
-    const title = `${c.artist || c.title} en ${c.venue} (${c.date}) — misconciertos`;
-    const description = `${c.artist || c.title} toca en ${c.venue}, Buenos Aires, el ${formatConcertDate(c.date)}${c.time ? ` a las ${c.time} hs` : ""}.${c.price ? ` Entradas desde ${c.price}.` : ""} Comprá tu entrada.`;
     const canonicalUrl = `${SITE_URL}/concierto/${canonicalSlug}`;
     const isCanonical = c.slug === canonicalSlug;
+    const who = c.artist || c.title;
+    // La canónica de una tanda representa todas las fechas, así que su título y
+    // su snippet hablan de la tanda entera y no de una función suelta.
+    const isRunPage = isCanonical && run.length > 1;
+
+    const title = isRunPage
+      ? `${who} en ${c.venue}: todas las fechas — misconciertos`
+      : `${who} en ${c.venue}, ${formatDayMonthYear(c.date)} — misconciertos`;
+    const description = isRunPage
+      ? `${who} hace ${run.length} funciones en ${c.venue}, Buenos Aires: ${formatDateList(run.map((r) => r.date))}.${c.price ? ` Entradas desde ${c.price}.` : ""} Comprá tu entrada.`
+      : `${who} toca en ${c.venue}, Buenos Aires, el ${formatDateLong(c.date)}${c.time ? ` a las ${c.time} hs` : ""}.${c.price ? ` Entradas desde ${c.price}.` : ""} Comprá tu entrada.`;
     return {
       meta: [
         { title },
