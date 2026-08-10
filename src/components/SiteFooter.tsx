@@ -5,10 +5,7 @@ interface SiteFooterProps {
   className?: string;
 }
 
-/**
- * Pie con los links legales. Va en toda página que scrollee normal; el mapa
- * (que es pantalla completa) usa `SiteFooterOverlay`.
- */
+/** Pie con los links legales. Va al final de toda página, la home incluida. */
 export function SiteFooter({ className }: SiteFooterProps) {
   return (
     <footer
@@ -20,21 +17,6 @@ export function SiteFooter({ className }: SiteFooterProps) {
       <FooterLinks className="justify-center" />
       <p className="mt-3">© {new Date().getFullYear()} misconciertos</p>
     </footer>
-  );
-}
-
-/**
- * Variante flotante para el mapa: mismos links, apoyados abajo a la izquierda
- * sobre el canvas de Leaflet (la atribución de OSM vive abajo a la derecha).
- */
-export function SiteFooterOverlay({ className }: SiteFooterProps) {
-  return (
-    <FooterLinks
-      className={cn(
-        "rounded-full border border-border/60 bg-background/85 px-3 py-1.5 shadow-lg backdrop-blur-md",
-        className,
-      )}
-    />
   );
 }
 
