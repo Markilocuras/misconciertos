@@ -9,7 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TerminosRouteImport } from './routes/terminos'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as PrivacidadRouteImport } from './routes/privacidad'
 import { Route as Google7442d18f9dbf8186DothtmlRouteImport } from './routes/google7442d18f9dbf8186[.]html'
 import { Route as ConciertosRouteImport } from './routes/conciertos'
 import { Route as BajaRouteImport } from './routes/baja'
@@ -24,9 +26,19 @@ import { Route as ApiPublicHooksUnsubscribeDigestRouteImport } from './routes/ap
 import { Route as ApiPublicHooksTrackClickRouteImport } from './routes/api/public/hooks/track-click'
 import { Route as ApiPublicHooksIngestConcertsRouteImport } from './routes/api/public/hooks/ingest-concerts'
 
+const TerminosRoute = TerminosRouteImport.update({
+  id: '/terminos',
+  path: '/terminos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacidadRoute = PrivacidadRouteImport.update({
+  id: '/privacidad',
+  path: '/privacidad',
   getParentRoute: () => rootRouteImport,
 } as any)
 const Google7442d18f9dbf8186DothtmlRoute =
@@ -105,7 +117,9 @@ export interface FileRoutesByFullPath {
   '/baja': typeof BajaRoute
   '/conciertos': typeof ConciertosRoute
   '/google7442d18f9dbf8186.html': typeof Google7442d18f9dbf8186DothtmlRoute
+  '/privacidad': typeof PrivacidadRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terminos': typeof TerminosRoute
   '/perfil': typeof AuthenticatedPerfilRoute
   '/concierto/$slug': typeof ConciertoSlugRoute
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
@@ -120,7 +134,9 @@ export interface FileRoutesByTo {
   '/baja': typeof BajaRoute
   '/conciertos': typeof ConciertosRoute
   '/google7442d18f9dbf8186.html': typeof Google7442d18f9dbf8186DothtmlRoute
+  '/privacidad': typeof PrivacidadRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terminos': typeof TerminosRoute
   '/perfil': typeof AuthenticatedPerfilRoute
   '/concierto/$slug': typeof ConciertoSlugRoute
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
@@ -137,7 +153,9 @@ export interface FileRoutesById {
   '/baja': typeof BajaRoute
   '/conciertos': typeof ConciertosRoute
   '/google7442d18f9dbf8186.html': typeof Google7442d18f9dbf8186DothtmlRoute
+  '/privacidad': typeof PrivacidadRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terminos': typeof TerminosRoute
   '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
   '/concierto/$slug': typeof ConciertoSlugRoute
   '/_authenticated/admin/stats': typeof AuthenticatedAdminStatsRoute
@@ -154,7 +172,9 @@ export interface FileRouteTypes {
     | '/baja'
     | '/conciertos'
     | '/google7442d18f9dbf8186.html'
+    | '/privacidad'
     | '/sitemap.xml'
+    | '/terminos'
     | '/perfil'
     | '/concierto/$slug'
     | '/admin/stats'
@@ -169,7 +189,9 @@ export interface FileRouteTypes {
     | '/baja'
     | '/conciertos'
     | '/google7442d18f9dbf8186.html'
+    | '/privacidad'
     | '/sitemap.xml'
+    | '/terminos'
     | '/perfil'
     | '/concierto/$slug'
     | '/admin/stats'
@@ -185,7 +207,9 @@ export interface FileRouteTypes {
     | '/baja'
     | '/conciertos'
     | '/google7442d18f9dbf8186.html'
+    | '/privacidad'
     | '/sitemap.xml'
+    | '/terminos'
     | '/_authenticated/perfil'
     | '/concierto/$slug'
     | '/_authenticated/admin/stats'
@@ -202,7 +226,9 @@ export interface RootRouteChildren {
   BajaRoute: typeof BajaRoute
   ConciertosRoute: typeof ConciertosRoute
   Google7442d18f9dbf8186DothtmlRoute: typeof Google7442d18f9dbf8186DothtmlRoute
+  PrivacidadRoute: typeof PrivacidadRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  TerminosRoute: typeof TerminosRoute
   ConciertoSlugRoute: typeof ConciertoSlugRoute
   ApiPublicHooksIngestConcertsRoute: typeof ApiPublicHooksIngestConcertsRoute
   ApiPublicHooksTrackClickRoute: typeof ApiPublicHooksTrackClickRoute
@@ -211,11 +237,25 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terminos': {
+      id: '/terminos'
+      path: '/terminos'
+      fullPath: '/terminos'
+      preLoaderRoute: typeof TerminosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sitemap.xml': {
       id: '/sitemap.xml'
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacidad': {
+      id: '/privacidad'
+      path: '/privacidad'
+      fullPath: '/privacidad'
+      preLoaderRoute: typeof PrivacidadRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/google7442d18f9dbf8186.html': {
@@ -333,7 +373,9 @@ const rootRouteChildren: RootRouteChildren = {
   BajaRoute: BajaRoute,
   ConciertosRoute: ConciertosRoute,
   Google7442d18f9dbf8186DothtmlRoute: Google7442d18f9dbf8186DothtmlRoute,
+  PrivacidadRoute: PrivacidadRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  TerminosRoute: TerminosRoute,
   ConciertoSlugRoute: ConciertoSlugRoute,
   ApiPublicHooksIngestConcertsRoute: ApiPublicHooksIngestConcertsRoute,
   ApiPublicHooksTrackClickRoute: ApiPublicHooksTrackClickRoute,

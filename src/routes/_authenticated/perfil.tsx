@@ -10,6 +10,7 @@ import {
   User as UserIcon,
   X,
 } from "lucide-react";
+import { SiteFooter } from "@/components/SiteFooter";
 import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -63,9 +64,7 @@ function ProfilePage() {
       supabase.from("profiles").select("username").eq("id", user.id).maybeSingle(),
       supabase
         .from("saved_concerts")
-        .select(
-          "id, concerts(title, artist, venue, date, time, price, image_url, slug)",
-        )
+        .select("id, concerts(title, artist, venue, date, time, price, image_url, slug)")
         .order("created_at", { ascending: false }),
       supabase
         .from("artist_comments")
@@ -253,6 +252,8 @@ function ProfilePage() {
             </ul>
           )}
         </section>
+
+        <SiteFooter />
       </div>
     </main>
   );

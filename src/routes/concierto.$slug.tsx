@@ -8,6 +8,7 @@ import { AddToCalendar } from "@/components/AddToCalendar";
 import { SaveButton } from "@/components/SaveButton";
 import { ShareButton } from "@/components/ShareButton";
 import { BuyButton } from "@/components/BuyButton";
+import { SiteFooter } from "@/components/SiteFooter";
 import { SITE_URL } from "@/lib/site";
 
 function parsePriceArs(price: string): number | null {
@@ -207,6 +208,8 @@ function ConcertPage() {
             <Clock className="h-4 w-4" /> Agenda de la semana
           </Link>
         </div>
+
+        <SiteFooter />
       </div>
     </main>
   );

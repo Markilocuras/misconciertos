@@ -42,6 +42,7 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [notify, setNotify] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -55,6 +56,10 @@ function AuthPage() {
     setSubmitting(true);
     try {
       if (mode === "register") {
+        if (!acceptedTerms) {
+          toast.error("Tenés que aceptar los Términos y la Política de Privacidad.");
+          return;
+        }
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -62,7 +67,13 @@ function AuthPage() {
             // Todavía no hay sesión (falta confirmar el mail), así que la
             // preferencia viaja acá y la materializa el trigger
             // on_auth_user_created_concert_digest.
-            data: { username: username.trim(), notify_new_concerts: notify },
+            data: {
+              username: username.trim(),
+              notify_new_concerts: notify,
+              // Constancia de cuándo aceptó los Términos, por si hay que
+              // demostrar el consentimiento (Ley 25.326).
+              terms_accepted_at: new Date().toISOString(),
+            },
             emailRedirectTo: `${window.location.origin}/`,
           },
         });
@@ -159,12 +170,33 @@ function AuthPage() {
               </span>
             </label>
           )}
-          <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting
-              ? "Procesando..."
-              : isRegister
-                ? "Crear cuenta"
-                : "Entrar"}
+          {isRegister && (
+            <label className="flex cursor-pointer items-start gap-2 text-sm text-muted-foreground">
+              <Checkbox
+                id="terms"
+                checked={acceptedTerms}
+                onCheckedChange={(checked) => setAcceptedTerms(checked === true)}
+                className="mt-0.5"
+              />
+              <span>
+                Acepto los{" "}
+                <Link to="/terminos" target="_blank" className="text-primary hover:underline">
+                  Términos y Condiciones
+                </Link>{" "}
+                y la{" "}
+                <Link to="/privacidad" target="_blank" className="text-primary hover:underline">
+                  Política de Privacidad
+                </Link>
+                .
+              </span>
+            </label>
+          )}
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={submitting || (isRegister && !acceptedTerms)}
+          >
+            {submitting ? "Procesando..." : isRegister ? "Crear cuenta" : "Entrar"}
           </Button>
         </form>
 
