@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
+import { buildRunIndex } from "@/lib/concert-runs";
 import type { Database } from "@/integrations/supabase/types";
 
 export type ConcertRow = {
@@ -42,11 +43,9 @@ const LINK_COLUMNS = "id, slug, title, artist, venue, date, time, image_url";
 const RELATED_LIMIT = 6;
 
 function anonClient() {
-  return createClient<Database>(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_PUBLISHABLE_KEY!,
-    { auth: { storage: undefined, persistSession: false, autoRefreshToken: false } },
-  );
+  return createClient<Database>(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
+    auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+  });
 }
 
 // Query compartida entre el server fn, el sitemap y la agenda (server-side).
@@ -117,6 +116,34 @@ async function fetchRelatedConcerts(concert: ConcertRow): Promise<ConcertLinkRow
   return related;
 }
 
+// Las otras funciones de la misma tanda: mismo artista, mismo venue, fechas
+// cercanas. Es lo que deja canonicalizar los cuasi-duplicados hacia una sola
+// página y listar ahí todas las fechas. Ver concert-runs.ts.
+async function fetchRun(concert: ConcertRow): Promise<ConcertRow[]> {
+  if (!concert.artist || !concert.venue || !concert.date || !concert.slug) return [concert];
+
+  const today = new Date().toISOString().slice(0, 10);
+  const { data, error } = await anonClient()
+    .from("concerts")
+    .select(SELECT_COLUMNS)
+    .eq("artist", concert.artist)
+    .eq("venue", concert.venue)
+    .gte("date", today)
+    .neq("source", "seed")
+    .not("slug", "is", null)
+    .order("date", { ascending: true });
+
+  if (error) {
+    console.error("[getConcertBySlug] run error", error);
+    return [concert];
+  }
+
+  const rows = (data ?? []) as ConcertRow[];
+  // Si el show ya pasó no está en la query de arriba, y entonces no es parte de
+  // ninguna tanda vigente: se canonicaliza a sí mismo.
+  return buildRunIndex(rows).get(concert.id)?.run ?? [concert];
+}
+
 export const getConcertBySlug = createServerFn({ method: "GET" })
   .validator((slug: unknown): string => {
     if (typeof slug !== "string" || !/^[a-z0-9-]{1,300}$/.test(slug)) {
@@ -133,10 +160,21 @@ export const getConcertBySlug = createServerFn({ method: "GET" })
 
     if (error) {
       console.error("[getConcertBySlug] supabase error", error);
-      return { concert: null as ConcertRow | null, related: [] as ConcertLinkRow[] };
+      return {
+        concert: null as ConcertRow | null,
+        related: [] as ConcertLinkRow[],
+        run: [] as ConcertRow[],
+      };
     }
     const concert = (data as ConcertRow | null) ?? null;
-    if (!concert) return { concert: null as ConcertRow | null, related: [] as ConcertLinkRow[] };
+    if (!concert) {
+      return {
+        concert: null as ConcertRow | null,
+        related: [] as ConcertLinkRow[],
+        run: [] as ConcertRow[],
+      };
+    }
 
-    return { concert, related: await fetchRelatedConcerts(concert) };
+    const [related, run] = await Promise.all([fetchRelatedConcerts(concert), fetchRun(concert)]);
+    return { concert, related, run };
   });

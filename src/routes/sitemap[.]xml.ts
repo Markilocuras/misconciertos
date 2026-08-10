@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type {} from "@tanstack/react-start";
+import { buildRunIndex } from "@/lib/concert-runs";
 import { fetchUpcomingConcertRows } from "@/lib/concerts.functions";
 import { SITE_URL } from "@/lib/site";
 
@@ -25,8 +26,13 @@ export const Route = createFileRoute("/sitemap.xml")({
         ];
 
         const { concerts } = await fetchUpcomingConcertRows();
+        // Solo URLs canónicas: ofrecerle a Google las fechas repetidas de una
+        // tanda, que apuntan su canonical a la primera, es pedirle que rastree
+        // duplicados. Ver concert-runs.ts.
+        const runs = buildRunIndex(concerts);
         for (const c of concerts) {
           if (!c.slug) continue;
+          if (runs.get(c.id)?.canonicalSlug !== c.slug) continue;
           entries.push({
             path: `/concierto/${c.slug}`,
             lastmod: c.updated_at?.slice(0, 10),

@@ -442,7 +442,12 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
                   date: perf.date,
                   time: perf.time,
                   price: perf.price,
-                  description: candidate.venue ? `Concierto en ${candidate.venue}.` : null,
+                  // Ticketek no trae descripción y fabricarla acá como
+                  // "Concierto en {venue}." dejaba 31 fichas del Movistar Arena
+                  // diciendo exactamente lo mismo. El texto de la ficha se
+                  // compone al renderizar, con los datos de la fila: ver
+                  // src/lib/concert-copy.ts.
+                  description: null,
                   image_url: candidate.image,
                   buy_url: buyUrl,
                   locality: null,
