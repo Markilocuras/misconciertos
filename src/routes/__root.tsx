@@ -12,8 +12,7 @@ import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 import { useAnalytics } from "@/hooks/use-analytics";
 import { GA_HEAD_SCRIPTS } from "@/lib/analytics";
-import { SITE_URL } from "@/lib/site";
-
+import { INSTAGRAM_URL, SITE_URL } from "@/lib/site";
 
 function NotFoundComponent() {
   return (
@@ -113,6 +112,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         type: "image/svg+xml",
         href: "/favicon.svg",
       },
+      // Google renderiza el favicon del buscador a 48px y prefiere un raster
+      // cuadrado de un múltiplo de 48. Soporta SVG, pero sin este fallback
+      // depende de que lo rasterice él: 192 = 48x4.
+      {
+        rel: "icon",
+        type: "image/png",
+        sizes: "192x192",
+        href: "/icon-192.png",
+      },
       // iOS ignora el SVG al agregar a pantalla de inicio: necesita este PNG.
       {
         rel: "apple-touch-icon",
@@ -136,6 +144,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
               "@type": "Organization",
               name: "misconciertos",
               url: SITE_URL,
+              // El favicon del buscador sale de los <link rel="icon">; esto es
+              // para las superficies donde Google muestra el logo de la marca.
+              logo: `${SITE_URL}/icon-512.png`,
+              // Así Google sabe que la cuenta de Instagram es de esta marca y
+              // no de un tercero con nombre parecido.
+              sameAs: [INSTAGRAM_URL],
             },
             {
               "@type": "WebSite",
@@ -179,4 +193,3 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
-

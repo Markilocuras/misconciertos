@@ -216,11 +216,13 @@ function Index() {
           </ClientOnly>
         </div>
 
-        {/* En celular no entra todo en una fila: el filtro baja a una segunda línea. */}
+        {/* Fijo: la marca y el acceso a la cuenta acompañan el scroll, así no hay
+            que volver arriba desde la lista. El filtro no vive acá porque es un
+            control del mapa y se va con él. */}
         <header
-          className={`pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-wrap items-center gap-2 p-3 md:gap-3 md:p-6 ${selected ? "md:pr-[440px]" : ""}`}
+          className={`pointer-events-none fixed inset-x-0 top-0 z-30 flex flex-wrap items-center gap-2 p-3 md:gap-3 md:p-6 ${selected ? "md:pr-[440px]" : ""}`}
         >
-          <div className="pointer-events-auto order-1 flex min-w-0 items-center gap-2 rounded-full border border-border/60 bg-background/85 px-3 py-2 shadow-lg backdrop-blur-md md:px-4">
+          <div className="pointer-events-auto flex min-w-0 items-center gap-2 rounded-full border border-border/60 bg-background/85 px-3 py-2 shadow-lg backdrop-blur-md md:px-4">
             <img src="/logo.svg" alt="" className="h-7 w-7 shrink-0" />
             <h1 className="truncate text-sm font-semibold tracking-tight">
               misconciertos{" "}
@@ -255,12 +257,20 @@ function Index() {
               Cartelera
             </Link>
           </div>
-          <AuthMenu className="order-2 ml-auto xl:order-3 xl:ml-0" />
-          {/* Hasta xl el filtro se lleva una fila entera y el AuthMenu se queda
-            arriba a la derecha; recién con ancho de sobra entran los tres en la
-            misma fila. Cuando el filtro competía por lugar antes de eso, el que
-            caía a la segunda fila era el AuthMenu. */}
-          <div className="order-3 flex w-full min-w-0 items-center xl:order-2 xl:ml-auto xl:w-auto">
+          <AuthMenu className="ml-auto" />
+        </header>
+
+        {/* Justo debajo del header fijo, pero anclado al mapa: al scrollear se va
+            con él. Los offsets son el alto del header medido, que depende de si
+            entra en una fila: hasta ~690px el AuthMenu baja a una segunda
+            (119px), después es una sola con padding chico (69px) y de md para
+            arriba una sola con padding grande (93px). El corte va en 720 y no
+            en 690 para que el margen de error deje el filtro más abajo de la
+            cuenta y nunca encima del header. */}
+        <div
+          className={`pointer-events-none absolute inset-x-0 top-[119px] z-10 flex px-3 min-[720px]:top-[69px] md:top-[93px] md:px-6 ${selected ? "md:pr-[440px]" : ""}`}
+        >
+          <div className="pointer-events-auto flex w-full min-w-0 items-center">
             <DateFilter
               from={dateFrom}
               to={dateTo}
@@ -271,7 +281,7 @@ function Index() {
               onSelectConcert={openConcert}
             />
           </div>
-        </header>
+        </div>
 
         {selected && (
           <>

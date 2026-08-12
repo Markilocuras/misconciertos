@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
+import { MailCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -44,6 +45,10 @@ function AuthPage() {
   const [notify, setNotify] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Sobrevive al cambio de mode porque es la misma ruta: el componente no se
+  // desmonta, así que el aviso queda a la vista en el formulario de login en
+  // lugar de irse con el toast.
+  const [pendingConfirmation, setPendingConfirmation] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -60,7 +65,7 @@ function AuthPage() {
           toast.error("Tenés que aceptar los Términos y la Política de Privacidad.");
           return;
         }
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -78,7 +83,19 @@ function AuthPage() {
           },
         });
         if (error) throw error;
-        toast.success("Cuenta creada. Revisá tu email para confirmar.");
+
+        if (data.session) {
+          // El proyecto no está exigiendo confirmar el mail: la cuenta ya quedó
+          // activa y con sesión, así que no tiene sentido mandar a revisar la
+          // casilla ni a iniciar sesión de nuevo.
+          toast.success("¡Cuenta creada! Ya estás dentro.");
+          navigate({ to: "/" });
+        } else {
+          toast.success("Cuenta creada. Te mandamos un mail para confirmarla.");
+          setPendingConfirmation(true);
+          setPassword("");
+          navigate({ to: "/auth", search: { mode: "login" } });
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -113,6 +130,21 @@ function AuthPage() {
             ? "Registrate para guardar y comprar entradas."
             : "Ingresá con tu email y contraseña."}
         </p>
+
+        {pendingConfirmation && !isRegister && (
+          <div
+            role="status"
+            className="mt-4 flex gap-2 rounded-lg border border-primary/40 bg-primary/10 p-3 text-sm"
+          >
+            <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <span>
+              Te mandamos un mail para confirmar tu cuenta.
+              <span className="block text-xs text-muted-foreground">
+                Abrilo, confirmá y volvé acá a iniciar sesión. Si no lo ves, revisá el spam.
+              </span>
+            </span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           {isRegister && (
