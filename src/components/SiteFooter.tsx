@@ -1,4 +1,6 @@
 import { Link } from "@tanstack/react-router";
+import { Instagram } from "lucide-react";
+import { INSTAGRAM_URL } from "@/lib/site";
 import { cn } from "@/lib/utils";
 
 interface SiteFooterProps {
@@ -15,6 +17,20 @@ export function SiteFooter({ className }: SiteFooterProps) {
       )}
     >
       <FooterLinks className="justify-center" />
+
+      <div className="mt-4 flex justify-center">
+        <a
+          href={INSTAGRAM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Seguinos en Instagram (@misconciertos.ar)"
+          title="@misconciertos.ar"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground transition hover:border-primary/40 hover:text-foreground"
+        >
+          <Instagram className="h-4 w-4" />
+        </a>
+      </div>
+
       <p className="mt-3">© {new Date().getFullYear()} misconciertos</p>
     </footer>
   );
