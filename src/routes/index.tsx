@@ -1,4 +1,10 @@
-import { ClientOnly, createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import {
+  CatchBoundary,
+  ClientOnly,
+  createFileRoute,
+  Link,
+  useNavigate,
+} from "@tanstack/react-router";
 import { lazy, Suspense, useCallback, useMemo, useState } from "react";
 import { ConcertDetails } from "@/components/ConcertDetails";
 import { DateFilter } from "@/components/DateFilter";
@@ -82,6 +88,18 @@ export const Route = createFileRoute("/")({
 
 // Cuántos shows se listan antes de mandar a la cartelera completa.
 const HOME_LIST_LIMIT = 24;
+
+// Lo que se ve en lugar del mapa si Leaflet falla. No ofrece "reintentar":
+// abajo está la cartelera completa, que es la alternativa útil.
+function MapFallbackNotice() {
+  return (
+    <div className="flex h-full w-full items-center justify-center bg-background px-6">
+      <p className="max-w-sm text-center text-sm text-muted-foreground">
+        No pudimos cargar el mapa. Los recitales están listados más abajo.
+      </p>
+    </div>
+  );
+}
 
 /**
  * El contenido que Google puede leer de la home. Los pins del mapa los dibuja
@@ -205,15 +223,21 @@ function Index() {
           hace zoom. */}
       <section className="relative h-[85svh] w-full overflow-hidden">
         <div className={`absolute inset-0 ${selected ? "md:right-[420px]" : ""}`}>
-          <ClientOnly fallback={mapFallback}>
-            <Suspense fallback={mapFallback}>
-              <ConcertMap
-                concerts={filtered}
-                selectedId={selected?.id ?? null}
-                onSelect={openConcert}
-              />
-            </Suspense>
-          </ClientOnly>
+          {/* El mapa va aislado: si Leaflet explota (ya pasó, con un
+              "Invalid LatLng" al montar antes de tener tamaño), el error no
+              tiene que llevarse puesta la página entera. El resto —header,
+              filtro y la cartelera de abajo— sigue en pie. */}
+          <CatchBoundary getResetKey={() => "mapa"} errorComponent={MapFallbackNotice}>
+            <ClientOnly fallback={mapFallback}>
+              <Suspense fallback={mapFallback}>
+                <ConcertMap
+                  concerts={filtered}
+                  selectedId={selected?.id ?? null}
+                  onSelect={openConcert}
+                />
+              </Suspense>
+            </ClientOnly>
+          </CatchBoundary>
         </div>
 
         {/* Fijo: la marca y el acceso a la cuenta acompañan el scroll, así no hay

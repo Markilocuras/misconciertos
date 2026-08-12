@@ -60,9 +60,28 @@ const DEFAULT_CENTER: [number, number] = [-34.6037, -58.3816];
 const DEFAULT_ZOOM = 12;
 const FOCUS_ZOOM = 14;
 
+// Leaflet interpola el vuelo dividiendo por el tamaño del contenedor: si el
+// mapa todavía no tiene alto o ancho (se montó antes de que el layout se lo
+// diera), las cuentas dan NaN y tira "Invalid LatLng object: (NaN, NaN)".
+// Cuando no hay tamaño usable se salta la animación y se centra y listo.
+function canAnimate(map: L.Map): boolean {
+  const size = map.getSize();
+  return size.x > 0 && size.y > 0;
+}
+
+function goTo(map: L.Map, center: L.LatLngExpression, zoom: number, duration: number) {
+  if (canAnimate(map)) map.flyTo(center, zoom, { duration });
+  else map.setView(center, zoom, { animate: false });
+}
+
 // Centra el mapa dejando el punto `offsetY` píxeles por debajo del centro, para
 // hacerle lugar arriba a lo que se abra anclado al pin.
 function flyToPin(map: L.Map, lat: number, lng: number, zoom: number, offsetY = 0) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || !Number.isFinite(zoom)) return;
+  if (!canAnimate(map)) {
+    map.setView([lat, lng], zoom, { animate: false });
+    return;
+  }
   const point = map.project([lat, lng], zoom).subtract([0, offsetY]);
   map.flyTo(map.unproject(point, zoom), zoom, { duration: 0.6 });
 }
@@ -78,7 +97,7 @@ function FlyTo({ concert }: { concert: Concert | null }) {
     if (concert) {
       flyToPin(map, concert.lat, concert.lng, FOCUS_ZOOM);
     } else {
-      map.flyTo(DEFAULT_CENTER, DEFAULT_ZOOM, { duration: 0.8 });
+      goTo(map, DEFAULT_CENTER, DEFAULT_ZOOM, 0.8);
     }
   }, [concert, map]);
 
