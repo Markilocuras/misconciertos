@@ -5,6 +5,7 @@ import { AddToCalendar } from "@/components/AddToCalendar";
 import { SaveButton } from "@/components/SaveButton";
 import { ShareButton } from "@/components/ShareButton";
 import { BuyButton } from "@/components/BuyButton";
+import { SpotifyButton } from "@/components/SpotifyButton";
 import { formatConcertDate, type Concert } from "@/data/concerts";
 
 type Props = {
@@ -79,6 +80,7 @@ export function ConcertDetails({ concert, onClose }: Props) {
             <ShareButton concert={concert} />
             <SaveButton concertId={concert.id} />
           </div>
+          <SpotifyButton concert={concert} />
           {concert.slug && (
             <Link
               to="/concierto/$slug"

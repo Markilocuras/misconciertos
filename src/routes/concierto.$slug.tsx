@@ -16,6 +16,7 @@ import { SaveButton } from "@/components/SaveButton";
 import { ShareButton } from "@/components/ShareButton";
 import { BuyButton } from "@/components/BuyButton";
 import { SiteFooter } from "@/components/SiteFooter";
+import { SpotifyButton } from "@/components/SpotifyButton";
 import { SITE_URL } from "@/lib/site";
 
 function parsePriceArs(price: string): number | null {
@@ -267,6 +268,7 @@ function ConcertPage() {
                 <ShareButton concert={concert} />
                 <SaveButton concertId={concert.id} />
               </div>
+              <SpotifyButton concert={concert} />
             </div>
 
             <RunDates run={run} current={concert} />
