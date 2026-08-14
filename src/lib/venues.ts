@@ -1,6 +1,19 @@
 // Coordenadas conocidas de venues de Buenos Aires y alrededores.
 // Compartido entre la ingesta (para geolocalizar eventos scrapeados) y el
 // mapa (para saber si un pin corresponde a un escenario conocido).
+//
+// Auditadas contra OpenStreetMap en agosto de 2026, después de que un usuario
+// reportara pines fuera de lugar. Las que quedaron son las que matchean un POI
+// con nombre y dirección en OSM, salvo estas cuatro, que no se pudieron
+// confirmar y siguen como estaban:
+//
+//   costa 21                 sin resultado en OSM
+//   campo argentino de polo  solo el polígono del predio, 1,3 km del centroide
+//   parque sarmiento         solo una calle homónima
+//   geba                     solo el polígono del club, 356 m del centroide
+//
+// Para agregar o corregir una, buscar el POI en OSM y usar esa coordenada; no
+// estimar a ojo, que es de donde salieron los errores que había.
 
 export const VENUE_COORDS: Record<string, { lat: number; lng: number }> = {
   "movistar arena": { lat: -34.5953, lng: -58.4475 },
@@ -14,34 +27,38 @@ export const VENUE_COORDS: Record<string, { lat: number; lng: number }> = {
   // Marcelo T. de Alvear 1125, Retiro. Estaba 348 m corrido, cerca del Obelisco.
   "teatro coliseo": { lat: -34.5967, lng: -58.3833 },
   "niceto club": { lat: -34.5862, lng: -58.4378 },
-  "usina del arte": { lat: -34.6345, lng: -58.3597 },
-  "mandarine park": { lat: -34.5453, lng: -58.4361 },
+  "usina del arte": { lat: -34.6288, lng: -58.3571 },
+  "mandarine park": { lat: -34.5652, lng: -58.3987 },
   // Federico Lacroze 3455, Colegiales. Estaba 750 m al norte.
   "teatro vorterix": { lat: -34.5801, lng: -58.451 },
   vorterix: { lat: -34.5801, lng: -58.451 },
-  "bebop club": { lat: -34.5889, lng: -58.4298 },
-  "estadio obras": { lat: -34.5456, lng: -58.4495 },
-  "obras sanitarias": { lat: -34.5456, lng: -58.4495 },
+  // Se mudó de Palermo a Moreno 364, Monserrat: estaba 5,9 km lejos.
+  "bebop club": { lat: -34.6112, lng: -58.3713 },
+  "estadio obras": { lat: -34.5455, lng: -58.458 },
+  "obras sanitarias": { lat: -34.5455, lng: -58.458 },
   // Corrientes 6271, Chacarita. Estaba 2,4 km al noreste, en pleno Palermo.
   "c art media": { lat: -34.5906, lng: -58.4479 },
   "complejo c art media": { lat: -34.5906, lng: -58.4479 },
   "art media": { lat: -34.5906, lng: -58.4479 },
-  "estadio unico": { lat: -34.9215, lng: -57.9919 },
+  "estadio unico": { lat: -34.9138, lng: -57.989 },
   "campo argentino de polo": { lat: -34.5746, lng: -58.4131 },
   "hipodromo de palermo": { lat: -34.5687, lng: -58.4263 },
   "hipodromo argentino de palermo": { lat: -34.5687, lng: -58.4263 },
   "estadio river plate": { lat: -34.5453, lng: -58.4498 },
   monumental: { lat: -34.5453, lng: -58.4498 },
-  "la trastienda": { lat: -34.6189, lng: -58.3705 },
-  groove: { lat: -34.5867, lng: -58.4259 },
+  "la trastienda": { lat: -34.6131, lng: -58.3705 },
+  groove: { lat: -34.5794, lng: -58.4231 },
   "parque sarmiento": { lat: -34.5548, lng: -58.4936 },
-  "estadio malvinas argentinas": { lat: -34.6026, lng: -58.4592 },
-  "microestadio malvinas": { lat: -34.6026, lng: -58.4592 },
+  // Gutenberg 350, La Paternal.
+  "estadio malvinas argentinas": { lat: -34.5925, lng: -58.4718 },
+  "microestadio malvinas": { lat: -34.5925, lng: -58.4718 },
   "teatro colon": { lat: -34.6011, lng: -58.3832 },
-  "centro galicia": { lat: -34.6095, lng: -58.4128 },
-  "palacio alsina": { lat: -34.6101, lng: -58.3737 },
+  // San José 224, Monserrat.
+  "centro galicia": { lat: -34.6114, lng: -58.3861 },
+  // Adolfo Alsina 940, Monserrat.
+  "palacio alsina": { lat: -34.6107, lng: -58.3797 },
   "costa 21": { lat: -34.5444, lng: -58.4383 },
-  "teatro flores": { lat: -34.6284, lng: -58.4635 },
+  "teatro flores": { lat: -34.6323, lng: -58.4746 },
   "estadio velez": { lat: -34.6356, lng: -58.5203 },
   velez: { lat: -34.6356, lng: -58.5203 },
   "estadio geba": { lat: -34.5694, lng: -58.4225 },
@@ -61,8 +78,8 @@ export const VENUE_COORDS: Record<string, { lat: number; lng: number }> = {
   "hipodromo de san isidro": { lat: -34.4841, lng: -58.5236 },
   "estadio ferro": { lat: -34.6187, lng: -58.4472 },
   "ferro carril oeste": { lat: -34.6187, lng: -58.4472 },
-  "auditorio belgrano": { lat: -34.5637, lng: -58.4527 },
-  uniclub: { lat: -34.6053, lng: -58.4133 },
+  "auditorio belgrano": { lat: -34.567, lng: -58.4495 },
+  uniclub: { lat: -34.6029, lng: -58.4121 },
   "la tangente": { lat: -34.5876, lng: -58.4325 },
 };
 
