@@ -6,10 +6,13 @@ export const VENUE_COORDS: Record<string, { lat: number; lng: number }> = {
   "movistar arena": { lat: -34.5953, lng: -58.4475 },
   "estadio luna park": { lat: -34.6022, lng: -58.3686 },
   "luna park": { lat: -34.6022, lng: -58.3686 },
-  "teatro gran rex": { lat: -34.6033, lng: -58.3814 },
-  "gran rex": { lat: -34.6033, lng: -58.3814 },
-  "teatro opera": { lat: -34.6034, lng: -58.3823 },
-  "teatro coliseo": { lat: -34.5993, lng: -58.3811 },
+  // Corrientes 857. Estaba 224 m corrido.
+  "teatro gran rex": { lat: -34.6031, lng: -58.379 },
+  "gran rex": { lat: -34.6031, lng: -58.379 },
+  // Corrientes 860, enfrente del Gran Rex. Estaba 309 m corrido.
+  "teatro opera": { lat: -34.6037, lng: -58.3789 },
+  // Marcelo T. de Alvear 1125, Retiro. Estaba 348 m corrido, cerca del Obelisco.
+  "teatro coliseo": { lat: -34.5967, lng: -58.3833 },
   "niceto club": { lat: -34.5862, lng: -58.4378 },
   "usina del arte": { lat: -34.6345, lng: -58.3597 },
   "mandarine park": { lat: -34.5453, lng: -58.4361 },
