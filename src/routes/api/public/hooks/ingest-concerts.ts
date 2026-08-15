@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Firecrawl from "@mendable/firecrawl-js";
 
+import { resolveSpotifyArtistIds } from "@/lib/spotify";
 import { findVenueCoords } from "@/lib/venues";
 import {
   sendNewConcertsDigest,
@@ -73,6 +74,7 @@ type ConcertRowInsert = {
   buy_url: string | null;
   last_seen_at: string;
   slug?: string;
+  spotify_artist_id?: string | null;
 };
 
 function toRow(source: string, externalId: string, ev: ScrapedEvent): ConcertRowInsert {
@@ -99,6 +101,24 @@ function toRow(source: string, externalId: string, ev: ScrapedEvent): ConcertRow
 // un venue fuera de la tabla de coordenadas queda descartado a propósito).
 function keepRow(row: ConcertRowInsert, today: string): boolean {
   return Boolean(row.title && row.date && row.date >= today && row.lat != null && row.lng != null);
+}
+
+// Le pega el id de artista de Spotify a las filas que se van a guardar, para
+// que la ficha pueda linkear al perfil en vez de a la búsqueda. Si no hay
+// credenciales o el artista no matchea, la fila queda con null y el botón cae
+// a la búsqueda: nunca frena la ingesta.
+async function attachSpotifyArtistIds(rows: ConcertRowInsert[]): Promise<void> {
+  const artists = rows.map((r) => r.artist).filter((a): a is string => Boolean(a));
+  if (artists.length === 0) return;
+
+  const ids = await resolveSpotifyArtistIds(
+    artists,
+    process.env.SPOTIFY_CLIENT_ID,
+    process.env.SPOTIFY_CLIENT_SECRET,
+  );
+  for (const row of rows) {
+    row.spotify_artist_id = row.artist ? (ids.get(row.artist.trim()) ?? null) : null;
+  }
 }
 
 // Duplicados dentro del mismo batch rompen el upsert de Postgres
@@ -221,6 +241,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
         ) {
           const kept = dedupeByExternalId(rows.filter((r) => keepRow(r, today)));
           assignSlugs(kept);
+          await attachSpotifyArtistIds(kept);
           if (kept.length > 0) {
             const { error } = await supabaseAdmin
               .from("concerts")

@@ -139,6 +139,7 @@ export type Database = {
           price: string | null
           slug: string | null
           source: string
+          spotify_artist_id: string | null
           time: string | null
           title: string
           updated_at: string
@@ -159,6 +160,7 @@ export type Database = {
           price?: string | null
           slug?: string | null
           source: string
+          spotify_artist_id?: string | null
           time?: string | null
           title: string
           updated_at?: string
@@ -179,6 +181,7 @@ export type Database = {
           price?: string | null
           slug?: string | null
           source?: string
+          spotify_artist_id?: string | null
           time?: string | null
           title?: string
           updated_at?: string

@@ -14,6 +14,8 @@ export type Concert = {
   lng: number;
   buyUrl: string;
   slug: string;
+  /** Id de artista en Spotify. Vacío cuando la ingesta no lo pudo resolver. */
+  spotifyArtistId: string;
   source?: string;
 };
 
@@ -52,6 +54,7 @@ export function toConcert(c: ConcertRow): Concert | null {
     lng: c.lng,
     buyUrl: c.buy_url ?? "#",
     slug: c.slug ?? "",
+    spotifyArtistId: c.spotify_artist_id ?? "",
     source: c.source,
   };
 }
