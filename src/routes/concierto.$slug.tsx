@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { Calendar, CalendarDays, Clock, Map as MapIcon, MapPin } from "lucide-react";
+import { Calendar, CalendarDays, Clock, MapPin } from "lucide-react";
 import { toConcert, formatConcertDate, type Concert } from "@/data/concerts";
 import {
   concertSummary,
@@ -12,6 +12,7 @@ import { getConcertBySlug, type ConcertLinkRow } from "@/lib/concerts.functions"
 import { ArtistComments } from "@/components/ArtistComments";
 import { ArtistAlert } from "@/components/ArtistAlert";
 import { AddToCalendar } from "@/components/AddToCalendar";
+import { BackToMap } from "@/components/BackToMap";
 import { SaveButton } from "@/components/SaveButton";
 import { ShareButton } from "@/components/ShareButton";
 import { BuyButton } from "@/components/BuyButton";
@@ -212,16 +213,7 @@ function ConcertPage() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-2xl px-4 py-6">
-        {/* Mucha gente cae acá desde Google sin pasar por el mapa: este es el
-            único anzuelo para que descubran el resto del sitio, así que va
-            naranja. No compite con "Comprar entradas" porque es más chico. */}
-        <Link
-          to="/"
-          className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition hover:bg-primary/90"
-        >
-          <MapIcon className="h-4 w-4" />
-          Ver el mapa de recitales
-        </Link>
+        <BackToMap />
 
         <div className="mt-4 overflow-hidden rounded-2xl border border-border bg-card">
           <img
