@@ -13,11 +13,13 @@ function SpotifyIcon({ className }: { className?: string }) {
   );
 }
 
-// No guardamos el id de artista de Spotify, así que se linkea la búsqueda por
-// nombre acotada a artistas. Sin credenciales, sin tocar el ingest y sin una
-// columna nueva: el reproductor web y la app resuelven las dos la misma URL.
-function spotifySearchUrl(artist: string): string {
-  return `https://open.spotify.com/search/${encodeURIComponent(artist)}/artists`;
+// Con el id que resolvió la ingesta se va derecho al perfil. Sin id —artista
+// que Spotify no matcheó, o fila vieja de antes de que existiera la columna—
+// se cae a la búsqueda por nombre, que deja al usuario a un click.
+function spotifyUrl(artist: string, artistId: string): string {
+  return artistId
+    ? `https://open.spotify.com/artist/${encodeURIComponent(artistId)}`
+    : `https://open.spotify.com/search/${encodeURIComponent(artist)}/artists`;
 }
 
 export function SpotifyButton({ concert }: { concert: Concert }) {
@@ -35,13 +37,15 @@ export function SpotifyButton({ concert }: { concert: Concert }) {
       </p>
       <Button asChild variant="secondary" size="sm" className="mt-3 w-full">
         <a
-          href={spotifySearchUrl(artist)}
+          href={spotifyUrl(artist, concert.spotifyArtistId)}
           target="_blank"
           rel="noopener noreferrer"
           onClick={() =>
             trackEvent("spotify_click", {
               concert_id: concert.id,
               artist,
+              // Para poder ver en GA cuántos caen al fallback de búsqueda.
+              destino: concert.spotifyArtistId ? "perfil" : "busqueda",
             })
           }
         >

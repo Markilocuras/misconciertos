@@ -19,11 +19,12 @@ export type ConcertRow = {
   lng: number | null;
   buy_url: string | null;
   slug: string | null;
+  spotify_artist_id: string | null;
   updated_at: string;
 };
 
 const SELECT_COLUMNS =
-  "id, source, external_id, title, artist, venue, date, time, price, description, image_url, lat, lng, buy_url, slug, updated_at";
+  "id, source, external_id, title, artist, venue, date, time, price, description, image_url, lat, lng, buy_url, slug, spotify_artist_id, updated_at";
 
 // Los "otros recitales" al pie de cada concierto son solo un link con foto: no
 // hace falta traerse la fila entera para renderizarlos.
