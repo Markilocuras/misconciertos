@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, CalendarDays, Clock, MapPin } from "lucide-react";
+import { CalendarDays, Clock, MapPin } from "lucide-react";
+import { BackToMap } from "@/components/BackToMap";
 import { SiteFooter } from "@/components/SiteFooter";
 import { toConcert, formatConcertDate, type Concert } from "@/data/concerts";
 import { listConcerts } from "@/lib/concerts.functions";
@@ -89,12 +90,7 @@ function CarteleraPage() {
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto max-w-2xl px-4 py-6">
         <div className="flex flex-wrap items-center gap-4 text-sm">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft className="h-4 w-4" /> Ver en el mapa
-          </Link>
+          <BackToMap />
           <Link
             to="/agenda"
             className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground"
