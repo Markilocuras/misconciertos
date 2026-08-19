@@ -43,6 +43,28 @@ export const Route = createFileRoute("/api/public/hooks/track-click")({
           if (!concertId && !buyUrl) return ok;
 
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+          // Los clics del admin no cuentan: son los de probar el sitio y
+          // ensucian las estadísticas. El endpoint sigue siendo público y
+          // anónimo para todo el mundo; el token solo viaja si hay sesión
+          // iniciada, y si falla la verificación el clic se registra igual.
+          const token = request.headers.get("Authorization")?.replace("Bearer ", "");
+          if (token) {
+            try {
+              const { data: userData } = await supabaseAdmin.auth.getUser(token);
+              const uid = userData.user?.id;
+              if (uid) {
+                const { data: isAdmin } = await supabaseAdmin.rpc("has_role", {
+                  _user_id: uid,
+                  _role: "admin",
+                });
+                if (isAdmin) return ok;
+              }
+            } catch (err) {
+              console.error("[track-click] admin check failed", err);
+            }
+          }
+
           await supabaseAdmin.from("concert_clicks").insert({
             concert_id: concertId,
             source,

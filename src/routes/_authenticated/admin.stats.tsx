@@ -1,7 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { getClickStats, type ClickStat } from "@/lib/stats.functions";
+import { getClickStats, type ClickPoint, type ClickStat } from "@/lib/stats.functions";
+import { ClickCharts } from "@/components/ClickCharts";
 import { ArrowLeft, BarChart3 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/admin/stats")({
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/_authenticated/admin/stats")({
 function StatsPage() {
   const fetchStats = useServerFn(getClickStats);
   const [stats, setStats] = useState<ClickStat[]>([]);
+  const [series, setSeries] = useState<ClickPoint[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +32,7 @@ function StatsPage() {
     fetchStats()
       .then((res) => {
         setStats(res.stats);
+        setSeries(res.series);
         setTotal(res.total);
       })
       .catch((err) => setError(err instanceof Error ? err.message : String(err)))
@@ -39,7 +42,10 @@ function StatsPage() {
   return (
     <main className="min-h-screen bg-background p-6 text-foreground">
       <div className="mx-auto max-w-5xl">
-        <Link to="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+        >
           <ArrowLeft className="h-4 w-4" /> Volver al mapa
         </Link>
 
@@ -66,6 +72,12 @@ function StatsPage() {
         {!error && !loading && stats.length === 0 && (
           <div className="rounded-md border border-border bg-card p-8 text-center text-sm text-muted-foreground">
             Todavía no hay clics registrados.
+          </div>
+        )}
+
+        {!error && stats.length > 0 && (
+          <div className="mb-6">
+            <ClickCharts series={series} total={total} />
           </div>
         )}
 
