@@ -211,12 +211,24 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
           const pendientes = (sinId ?? []).filter((r) => r.artist?.trim());
           // Varias fechas del mismo artista se resuelven con una sola búsqueda,
           // así que el tope se cuenta en artistas distintos, no en filas.
-          const artistas: string[] = [];
+          const todos: string[] = [];
           for (const row of pendientes) {
             const artist = (row.artist as string).trim();
-            if (!artistas.includes(artist)) artistas.push(artist);
-            if (artistas.length === MAX_SPOTIFY_BACKFILL_ARTISTS) break;
+            if (!todos.includes(artist)) todos.push(artist);
           }
+
+          // Los que Spotify no matchea —festivales, tributos, títulos de evento
+          // usados como artista— quedan pendientes para siempre. Tomando
+          // siempre los primeros por fecha taparían a los que sí se pueden
+          // resolver, así que la ventana rota un bloque por día y en unas pocas
+          // corridas recorre toda la lista.
+          const bloque = Math.floor(Date.now() / 86_400_000);
+          const desde =
+            todos.length > 0 ? (bloque * MAX_SPOTIFY_BACKFILL_ARTISTS) % todos.length : 0;
+          const artistas = [...todos.slice(desde), ...todos.slice(0, desde)].slice(
+            0,
+            MAX_SPOTIFY_BACKFILL_ARTISTS,
+          );
 
           const ids = await resolveSpotifyArtistIds(
             artistas,
