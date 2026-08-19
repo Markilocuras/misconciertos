@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { Concert } from "@/data/concerts";
+import { useAuth } from "@/hooks/use-auth";
 import { trackEvent } from "@/lib/analytics";
 
 // Preferencia local de quien ya vio el aviso y no lo quiere volver a ver.
@@ -54,6 +55,7 @@ function hostLabel(url: string): string {
 }
 
 export function BuyButton({ concert }: { concert: Concert }) {
+  const { session } = useAuth();
   const [open, setOpen] = useState(false);
   const [dontAskAgain, setDontAskAgain] = useState(false);
 
@@ -70,7 +72,12 @@ export function BuyButton({ concert }: { concert: Concert }) {
     try {
       fetch("/api/public/hooks/track-click", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          // Con sesión iniciada va el token para que el endpoint pueda
+          // descartar los clics del admin (ver track-click.ts).
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ concertId: concert.id, buyUrl: safeUrl }),
         keepalive: true,
       }).catch(() => {});

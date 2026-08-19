@@ -38,6 +38,11 @@ const MAX_ALLACCESS_EVENT_FETCHES = 20;
 // Ídem para Ticketek: páginas de artista (nivel intermedio) y de show.
 const MAX_TICKETEK_ARTIST_FETCHES = 8;
 const MAX_TICKETEK_SHOW_FETCHES = 12;
+// Backfill de ids de Spotify (?spotify=1). Cloudflare corta la invocación a los
+// 50 subrequests, y una corrida normal ya llega justo, así que el backfill va en
+// su propia invocación y con tope propio: por cada artista distinto sale una
+// búsqueda mas un update, o sea dos subrequests.
+const MAX_SPOTIFY_BACKFILL_ARTISTS = 18;
 
 const BROWSER_HEADERS = {
   "user-agent":
@@ -181,6 +186,85 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
         const debug = url.searchParams.get("debug") === "1";
         const today = new Date().toISOString().slice(0, 10);
         const results: Record<string, SourceReport> = {};
+
+        // El upsert solo le pone el id de Spotify a lo que vuelve a aparecer en
+        // el scrapeo, así que un show que ya salió del listado —o que se guardó
+        // antes de que existiera la columna— se quedaba con null para siempre y
+        // su ficha seguía linkeando a la búsqueda en vez de al perfil. Este modo
+        // resuelve esas filas aparte, sobre los shows futuros, que son los
+        // únicos que se muestran. No scrapea nada: es solo Spotify + update.
+        if (url.searchParams.get("spotify") === "1") {
+          const { data: sinId, error: sinIdErr } = await supabaseAdmin
+            .from("concerts")
+            .select("id, artist")
+            .is("spotify_artist_id", null)
+            .not("artist", "is", null)
+            .gte("date", today)
+            .order("date", { ascending: true });
+          if (sinIdErr) {
+            return new Response(JSON.stringify({ error: sinIdErr.message }), {
+              status: 500,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+
+          const pendientes = (sinId ?? []).filter((r) => r.artist?.trim());
+          // Varias fechas del mismo artista se resuelven con una sola búsqueda,
+          // así que el tope se cuenta en artistas distintos, no en filas.
+          const todos: string[] = [];
+          for (const row of pendientes) {
+            const artist = (row.artist as string).trim();
+            if (!todos.includes(artist)) todos.push(artist);
+          }
+
+          // Los que Spotify no matchea —festivales, tributos, títulos de evento
+          // usados como artista— quedan pendientes para siempre. Tomando
+          // siempre los primeros por fecha taparían a los que sí se pueden
+          // resolver, así que la ventana rota un bloque por día y en unas pocas
+          // corridas recorre toda la lista.
+          const bloque = Math.floor(Date.now() / 86_400_000);
+          const desde =
+            todos.length > 0 ? (bloque * MAX_SPOTIFY_BACKFILL_ARTISTS) % todos.length : 0;
+          const artistas = [...todos.slice(desde), ...todos.slice(0, desde)].slice(
+            0,
+            MAX_SPOTIFY_BACKFILL_ARTISTS,
+          );
+
+          const ids = await resolveSpotifyArtistIds(
+            artistas,
+            process.env.SPOTIFY_CLIENT_ID,
+            process.env.SPOTIFY_CLIENT_SECRET,
+          );
+          let filas = 0;
+          for (const [artist, spotifyId] of ids) {
+            const target = pendientes
+              .filter((r) => (r.artist as string).trim() === artist)
+              .map((r) => r.id);
+            if (target.length === 0) continue;
+            const { error: updErr } = await supabaseAdmin
+              .from("concerts")
+              .update({ spotify_artist_id: spotifyId })
+              .in("id", target);
+            if (updErr) {
+              console.error("[ingest-concerts] backfill spotify fallo", artist, updErr);
+              continue;
+            }
+            filas += target.length;
+          }
+
+          return new Response(
+            JSON.stringify({
+              ok: true,
+              spotifyBackfill: {
+                pendientes: pendientes.length,
+                intentados: artistas.length,
+                resueltos: ids.size,
+                filas,
+              },
+            }),
+            { status: 200, headers: { "Content-Type": "application/json" } },
+          );
+        }
 
         // Filas futuras ya conocidas: evita re-fetchear páginas de evento de
         // All Access y duplicar shows que Dale Play linkea a otra ticketera.
