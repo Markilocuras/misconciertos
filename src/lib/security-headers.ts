@@ -6,7 +6,12 @@ const SECURITY_HEADERS: Record<string, string> = {
   "X-Content-Type-Options": "nosniff",
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "strict-origin-when-cross-origin",
-  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  // geolocation=(self) y no (): la lista vacía se la prohíbe a todo el mundo,
+  // incluido este mismo origen, y entonces el navegador rechaza getCurrentPosition
+  // sin preguntar nada y el usuario tampoco puede habilitarla a mano —la política
+  // del sitio le gana al permiso. La necesita "Cerca mío" en el mapa. Cámara y
+  // micrófono siguen prohibidos: no los usa nadie acá.
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=(self)",
   "Strict-Transport-Security": "max-age=31536000",
 };
 
