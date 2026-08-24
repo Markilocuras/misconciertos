@@ -228,3 +228,23 @@
 .concert-popup ::-webkit-scrollbar { width: 0; height: 0; }
 .concert-popup * { scrollbar-width: none; }
 .concert-popup .leaflet-popup-tip { background: var(--card); border: 1px solid var(--border); }
+
+/* "Estás acá": celeste fijo a propósito, para que no se confunda con un pin de
+   concierto ni con el color de la marca. */
+.user-pin {
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: color-mix(in oklab, #38bdf8 30%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, #38bdf8 60%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.user-pin span {
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: #38bdf8;
+  border: 2px solid var(--background);
+}

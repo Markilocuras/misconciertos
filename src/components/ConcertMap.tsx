@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { formatConcertDate, type Concert } from "@/data/concerts";
+import type { Coords } from "@/lib/concert-filters";
 import { isKnownVenue } from "@/lib/venues";
 
 function escapeHtml(input: string): string {
@@ -56,9 +57,23 @@ function groupIcon(group: Group, active: boolean): L.DivIcon {
   });
 }
 
+// El punto del usuario no es un pin de concierto y no tiene que parecerlo: va
+// en el celeste de "estás acá" que todo mapa usa, no en el color de la marca.
+function userIcon(): L.DivIcon {
+  return new L.DivIcon({
+    className: "",
+    html: `<div class="user-pin"><span></span></div>`,
+    iconSize: [20, 20],
+    iconAnchor: [10, 10],
+  });
+}
+
 const DEFAULT_CENTER: [number, number] = [-34.6037, -58.3816];
 const DEFAULT_ZOOM = 12;
 const FOCUS_ZOOM = 14;
+// Más cerca que la vista de ciudad, pero abierto: la gracia de "cerca mío" es
+// ver qué recitales te rodean, no el bloque en el que estás parado.
+const NEARBY_ZOOM = 13;
 
 // Leaflet interpola el vuelo dividiendo por el tamaño del contenedor: si el
 // mapa todavía no tiene alto o ancho (se montó antes de que el layout se lo
@@ -86,7 +101,13 @@ function flyToPin(map: L.Map, lat: number, lng: number, zoom: number, offsetY = 
   map.flyTo(map.unproject(point, zoom), zoom, { duration: 0.6 });
 }
 
-function FlyTo({ concert }: { concert: Concert | null }) {
+function FlyTo({
+  concert,
+  userPosition,
+}: {
+  concert: Concert | null;
+  userPosition: Coords | null;
+}) {
   const map = useMap();
 
   useEffect(() => {
@@ -94,12 +115,17 @@ function FlyTo({ concert }: { concert: Concert | null }) {
     // cachea su tamaño: sin refrescarlo centra contra el ancho viejo y el pin
     // termina corrido, medio tapado por el panel.
     map.invalidateSize({ animate: false, pan: false });
+    // Lo que se está mirando manda. Cerrar la ficha con "cerca mío" prendido
+    // vuelve a tu zona, no al centro de la ciudad: si no, cada vez que cerrás
+    // un concierto perdés el lugar desde el que estabas buscando.
     if (concert) {
       flyToPin(map, concert.lat, concert.lng, FOCUS_ZOOM);
+    } else if (userPosition) {
+      goTo(map, [userPosition.lat, userPosition.lng], NEARBY_ZOOM, 0.8);
     } else {
       goTo(map, DEFAULT_CENTER, DEFAULT_ZOOM, 0.8);
     }
-  }, [concert, map]);
+  }, [concert, userPosition, map]);
 
   // Redimensionar la ventana también invalida el tamaño cacheado.
   useEffect(() => {
@@ -201,9 +227,10 @@ type Props = {
   concerts: Concert[];
   selectedId: string | null;
   onSelect: (c: Concert) => void;
+  userPosition?: Coords | null;
 };
 
-export function ConcertMap({ concerts, selectedId, onSelect }: Props) {
+export function ConcertMap({ concerts, selectedId, onSelect, userPosition = null }: Props) {
   const selected = concerts.find((c) => c.id === selectedId) ?? null;
   const groups = useMemo(() => groupByLocation(concerts), [concerts]);
 
@@ -220,7 +247,17 @@ export function ConcertMap({ concerts, selectedId, onSelect }: Props) {
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
       />
       <GroupMarkers groups={groups} selectedId={selectedId} onSelect={onSelect} />
-      <FlyTo concert={selected} />
+      {userPosition && (
+        // No interactivo y por debajo de los pines: es una referencia, y no
+        // tiene que robarle el click a un concierto que caiga encima.
+        <Marker
+          position={[userPosition.lat, userPosition.lng]}
+          icon={userIcon()}
+          interactive={false}
+          zIndexOffset={-1000}
+        />
+      )}
+      <FlyTo concert={selected} userPosition={userPosition} />
     </MapContainer>
   );
 }
