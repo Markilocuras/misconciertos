@@ -119,24 +119,6 @@ function discardReason(row: ConcertRowInsert, today: string): DiscardReason | nu
   return null;
 }
 
-// Le pega el id de artista de Spotify a las filas que se van a guardar, para
-// que la ficha pueda linkear al perfil en vez de a la búsqueda. Si no hay
-// credenciales o el artista no matchea, la fila queda con null y el botón cae
-// a la búsqueda: nunca frena la ingesta.
-async function attachSpotifyArtistIds(rows: ConcertRowInsert[]): Promise<void> {
-  const artists = rows.map((r) => r.artist).filter((a): a is string => Boolean(a));
-  if (artists.length === 0) return;
-
-  const ids = await resolveSpotifyArtistIds(
-    artists,
-    process.env.SPOTIFY_CLIENT_ID,
-    process.env.SPOTIFY_CLIENT_SECRET,
-  );
-  for (const row of rows) {
-    row.spotify_artist_id = row.artist ? (ids.get(row.artist.trim()) ?? null) : null;
-  }
-}
-
 // Duplicados dentro del mismo batch rompen el upsert de Postgres
 // ("cannot affect row a second time"), así que dedupeamos por external_id.
 function dedupeByExternalId(rows: ConcertRowInsert[]): ConcertRowInsert[] {
@@ -395,9 +377,17 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
             );
           }
 
+          // Ojo: las filas salen sin spotify_artist_id a propósito, y por dos
+          // motivos. Uno, resolver los ids acá cuesta una búsqueda por artista y
+          // por fuente, sin tope: una corrida normal se comía ~57 subrequests
+          // solo en eso y reventaba el techo de 50 de Cloudflare, dejando sin
+          // presupuesto a las fuentes que corren últimas y al mail de aviso.
+          // Dos, cuando la búsqueda no encontraba al artista escribía null, así
+          // que cada corrida le borraba al backfill los ids que ya había
+          // resuelto. Al no mandar la columna, el upsert la deja como está y el
+          // cron spotify-backfill-daily (06:00 UTC) la completa.
           const kept = dedupeByExternalId(usable);
           assignSlugs(kept);
-          await attachSpotifyArtistIds(kept);
           if (kept.length > 0) {
             const { error } = await supabaseAdmin
               .from("concerts")
