@@ -144,7 +144,10 @@ export function formatArsPrice(amount: number): string {
 // ---------------------------------------------------------------------------
 
 function parseDateAndTime(input: string): { date: string | null; time: string | null } {
-  const normalized = input.replace(/^[-*]\s*/, "").replace(/\s+\+\s+\d+\s+more/i, "").trim();
+  const normalized = input
+    .replace(/^[-*]\s*/, "")
+    .replace(/\s+\+\s+\d+\s+more/i, "")
+    .trim();
   const explicit = normalized.match(
     /(?:mon|tue|wed|thu|fri|sat|sun|lun|mar|mi[eé]|jue|vie|s[aá]b|dom)?\s*,?\s*(\d{1,2})\s+([a-záéíóúñ]+)\s*,?\s*(\d{4})?\s*(?:[-•]|a las)?\s*(\d{1,2}):(\d{2})\s*(am|pm)?/i,
   );
@@ -229,9 +232,7 @@ export function parseAllEventsMarkdown(markdown: string, baseUrl: string): Scrap
     if (linkIndex < 0) return null;
 
     const linkLine = segment[linkIndex];
-    const link = linkLine.match(
-      /\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]+)(?:\s+"[^"]*")?\)/,
-    );
+    const link = linkLine.match(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]+)(?:\s+"[^"]*")?\)/);
     if (!link) return null;
 
     const title = stripMarkdown(link[1]);
@@ -318,9 +319,10 @@ export function parseAllAccessEventPage(html: string, pageUrl: string): ScrapedE
   // publicar hora local aunque marquen "Z").
   const date = normalizeDate(ev.startDate);
   const timeMatch = ev.startDate.match(/T(\d{2}):(\d{2})/);
-  const time = timeMatch && `${timeMatch[1]}:${timeMatch[2]}` !== "00:00"
-    ? `${timeMatch[1]}:${timeMatch[2]}`
-    : null;
+  const time =
+    timeMatch && `${timeMatch[1]}:${timeMatch[2]}` !== "00:00"
+      ? `${timeMatch[1]}:${timeMatch[2]}`
+      : null;
 
   const prices = (ev.offers ?? [])
     .map((o) => Number(o.price))
@@ -362,9 +364,7 @@ export function parseDalePlayLive(html: string): ScrapedEvent[] {
 
   for (const card of cards) {
     const titleMatch = card.match(/events__grid__item__top__title[^>]*>\s*([^<]+?)\s*</);
-    const imageMatch = card.match(
-      /<img[^>]+class="events__grid__item__top__bg"[^>]+src="([^"]+)"/,
-    );
+    const imageMatch = card.match(/<img[^>]+class="events__grid__item__top__bg"[^>]+src="([^"]+)"/);
     if (!titleMatch) continue;
     const artist = decodeHtmlEntities(titleMatch[1]);
     const image = imageMatch ? safeHttpUrl(imageMatch[1]) : null;
