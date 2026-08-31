@@ -3,6 +3,7 @@ import type {} from "@tanstack/react-start";
 import { buildRunIndex } from "@/lib/concert-runs";
 import { fetchUpcomingConcertRows } from "@/lib/concerts.functions";
 import { SITE_URL } from "@/lib/site";
+import { todayInBuenosAires } from "@/lib/timezone";
 
 interface SitemapEntry {
   path: string;
@@ -15,7 +16,7 @@ export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
       GET: async () => {
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todayInBuenosAires();
         // Only public, indexable routes. /auth and /admin/* are noindex.
         const entries: SitemapEntry[] = [
           { path: "/", lastmod: today, changefreq: "daily", priority: "1.0" },

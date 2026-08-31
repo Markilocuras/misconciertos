@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { createClient } from "@supabase/supabase-js";
 import { buildRunIndex } from "@/lib/concert-runs";
+import { todayInBuenosAires } from "@/lib/timezone";
 import type { Database } from "@/integrations/supabase/types";
 
 export type ConcertRow = {
@@ -54,7 +55,7 @@ export async function fetchUpcomingConcertRows(): Promise<{
   concerts: ConcertRow[];
   error?: string;
 }> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInBuenosAires();
   const { data, error } = await anonClient()
     .from("concerts")
     .select(SELECT_COLUMNS)
@@ -80,7 +81,7 @@ export const listConcerts = createServerFn({ method: "GET" }).handler(() =>
 // sitemap, que es justamente lo que dispara "Descubierta: actualmente sin
 // indexar" en Search Console.
 async function fetchRelatedConcerts(concert: ConcertRow): Promise<ConcertLinkRow[]> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInBuenosAires();
   const client = anonClient();
 
   const baseQuery = () =>
@@ -123,7 +124,7 @@ async function fetchRelatedConcerts(concert: ConcertRow): Promise<ConcertLinkRow
 async function fetchRun(concert: ConcertRow): Promise<ConcertRow[]> {
   if (!concert.artist || !concert.venue || !concert.date || !concert.slug) return [concert];
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInBuenosAires();
   const { data, error } = await anonClient()
     .from("concerts")
     .select(SELECT_COLUMNS)

@@ -3,6 +3,7 @@ import { CalendarDays, Clock, MapPin } from "lucide-react";
 import { BackToMap } from "@/components/BackToMap";
 import { SiteFooter } from "@/components/SiteFooter";
 import { toConcert, formatConcertDate, type Concert } from "@/data/concerts";
+import { todayInBuenosAires } from "@/lib/timezone";
 import { listConcerts } from "@/lib/concerts.functions";
 import { SITE_URL } from "@/lib/site";
 
@@ -38,7 +39,7 @@ function agendaJsonLd(concerts: Concert[]): string {
 export const Route = createFileRoute("/agenda")({
   loader: async () => {
     const res = await listConcerts();
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayInBuenosAires();
     const until = plusDays(today, WEEK_DAYS);
     const concerts = (res.concerts ?? [])
       .map(toConcert)

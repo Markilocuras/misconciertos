@@ -1,8 +1,8 @@
 import { CalendarPlus, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Concert } from "@/data/concerts";
+import { TIMEZONE as TZ } from "@/lib/timezone";
 
-const TZ = "America/Argentina/Buenos_Aires";
 const DEFAULT_DURATION_HOURS = 3;
 
 // "2026-08-20" + "21:00" → "20260820T210000" (hora local flotante; el timezone

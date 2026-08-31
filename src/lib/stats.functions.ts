@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { TIMEZONE } from "@/lib/timezone";
 
 export type ClickStat = {
   concert_id: string | null;
@@ -26,7 +27,7 @@ const SERIES_DAYS = 30;
 // Buenos Aires es UTC del día siguiente, así que los días se cortan en hora
 // argentina o la serie queda corrida.
 const AR_DAY = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "America/Argentina/Buenos_Aires",
+  timeZone: TIMEZONE,
   year: "numeric",
   month: "2-digit",
   day: "2-digit",
