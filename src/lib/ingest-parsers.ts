@@ -140,127 +140,79 @@ export function formatArsPrice(amount: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// allevents.in — listado en markdown de Firecrawl
+// allevents.in — listado HTML. Antes esto pasaba por Firecrawl porque se creía
+// que el listado se armaba en el cliente, pero allevents sirve las cards ya
+// renderizadas: alcanza con un fetch por listado y se ahorra la dependencia
+// (y la API key, que nunca llegó a estar configurada).
 // ---------------------------------------------------------------------------
 
-function parseDateAndTime(input: string): { date: string | null; time: string | null } {
-  const normalized = input.replace(/^[-*]\s*/, "").replace(/\s+\+\s+\d+\s+more/i, "").trim();
-  const explicit = normalized.match(
-    /(?:mon|tue|wed|thu|fri|sat|sun|lun|mar|mi[eé]|jue|vie|s[aá]b|dom)?\s*,?\s*(\d{1,2})\s+([a-záéíóúñ]+)\s*,?\s*(\d{4})?\s*(?:[-•]|a las)?\s*(\d{1,2}):(\d{2})\s*(am|pm)?/i,
-  );
-  if (!explicit) return { date: normalizeDate(input), time: null };
+// "Thu, 03 Sep, 2026 - 07:00 PM", y también "Thu, 10 Sep • 07:00 PM + 1 more",
+// que viene sin año.
+function parseAllEventsDateTime(
+  input: string,
+  now: Date,
+): { date: string | null; time: string | null } {
+  const dm = input.match(/(\d{1,2})\s+([a-záéíóúñ]{3,})\.?,?\s*(\d{4})?/i);
+  if (!dm) return { date: null, time: null };
+  const month = MONTHS[dm[2].toLowerCase()];
+  if (!month) return { date: null, time: null };
 
-  const day = Number(explicit[1]);
-  const month = MONTHS[explicit[2].toLowerCase()];
-  if (!month || !day) return { date: normalizeDate(input), time: null };
+  let year = dm[3] ? Number(dm[3]) : now.getUTCFullYear();
+  // Sin año explícito la fecha siempre es la próxima vez que cae ese día:
+  // allevents no lista shows pasados, así que un mes ya vencido es del año que
+  // viene. Sin esto, en diciembre todo enero entraría con fecha pasada y se
+  // descartaría entero.
+  if (!dm[3] && month < now.getUTCMonth() + 1) year += 1;
 
-  const now = new Date();
-  let year = explicit[3] ? Number(explicit[3]) : now.getFullYear();
-  const candidate = new Date(Date.UTC(year, month - 1, day));
-  const today = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
-  if (!explicit[3] && candidate < today) year += 1;
-
-  let hour = Number(explicit[4]);
-  const minute = Number(explicit[5]);
-  const meridiem = explicit[6]?.toLowerCase();
-  if (meridiem === "pm" && hour < 12) hour += 12;
-  if (meridiem === "am" && hour === 12) hour = 0;
-
-  return {
-    date: toIsoDate(year, month, day),
-    time: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`,
-  };
-}
-
-function looksLikeDateLine(line: string): boolean {
-  return /(?:mon|tue|wed|thu|fri|sat|sun|lun|mar|mi[eé]|jue|vie|s[aá]b|dom)\s*,?\s*\d{1,2}\s+[a-záéíóúñ]+/i.test(
-    line,
-  );
-}
-
-function looksLikeNoise(line: string): boolean {
-  return (
-    /^!\[/.test(line) ||
-    /^\|$/.test(line) ||
-    /interested/i.test(line) ||
-    /^(share|open app|sign in|create event|get updates|added to interests)$/i.test(line) ||
-    /^\[.*\]\(#\)$/.test(line)
-  );
-}
-
-function extractPrice(lines: string[]): string | null {
-  const found = lines.find(
-    (line) => /\b(ARS|EUR|USD|free|gratis|\$)\b/i.test(line) && line.length <= 80,
-  );
-  return found ? stripMarkdown(found.replace(/^[-*]\s*/, "")) : null;
-}
-
-function extractMarkdownImage(lines: string[]): string | null {
-  for (const line of lines) {
-    const img = line.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)/);
-    if (img) return safeHttpUrl(img[1]);
+  const tm = input.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+  let time: string | null = null;
+  if (tm) {
+    let hour = Number(tm[1]);
+    const meridiem = tm[3]?.toLowerCase();
+    if (meridiem === "pm" && hour < 12) hour += 12;
+    if (meridiem === "am" && hour === 12) hour = 0;
+    time = `${String(hour).padStart(2, "0")}:${tm[2]}`;
   }
-  return null;
+
+  return { date: toIsoDate(year, month, Number(dm[1])), time };
 }
 
-export function parseAllEventsMarkdown(markdown: string, baseUrl: string): ScrapedEvent[] {
-  const lines = markdown
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
+export function parseAllEventsListing(html: string, now: Date = new Date()): ScrapedEvent[] {
+  const cards = html.split('class="event-card event-card-link"').slice(1);
+  const events: ScrapedEvent[] = [];
 
-  const segments: string[][] = [];
-  let current: string[] | null = null;
-  for (const line of lines) {
-    if (looksLikeDateLine(line)) {
-      if (current?.length) segments.push(current);
-      current = [line];
-      continue;
-    }
-    if (current) current.push(line);
-  }
-  if (current?.length) segments.push(current);
+  for (const card of cards) {
+    const linkMatch = card.match(/data-link="([^"]+)"/);
+    const titleMatch = card.match(/<h3>\s*([\s\S]*?)\s*<\/h3>/);
+    const dateMatch = card.match(/class="date"[^>]*>\s*([^<]+?)\s*<\/div>/);
+    if (!linkMatch || !titleMatch || !dateMatch) continue;
 
-  const parsed: Array<ScrapedEvent | null> = segments.map((segment) => {
-    const { date, time } = parseDateAndTime(segment[0]);
-    const linkIndex = segment.findIndex((line) =>
-      /\[[^\]]+\]\((https?:\/\/[^)\s]+|\/[^)\s]+)(?:\s+"[^"]*")?\)/.test(line),
-    );
-    if (linkIndex < 0) return null;
+    const venueMatch = card.match(/class="location[^"]*"[^>]*>\s*([^<]+?)\s*<\/div>/);
+    // Las cards de arriba traen la imagen inline; las que entran por debajo del
+    // fold vienen lazy y la dejan en data-src.
+    const imageMatch =
+      card.match(/class="banner-cont[^"]*"[^>]*background:url\(([^)]+)\)/) ??
+      card.match(/class="banner-cont[^"]*"[^>]*data-src="([^"]+)"/);
 
-    const linkLine = segment[linkIndex];
-    const link = linkLine.match(
-      /\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]+)(?:\s+"[^"]*")?\)/,
-    );
-    if (!link) return null;
+    const title = decodeHtmlEntities(titleMatch[1]);
+    const venue = venueMatch ? decodeHtmlEntities(venueMatch[1]) : null;
+    const { date, time } = parseAllEventsDateTime(dateMatch[1], now);
 
-    const title = stripMarkdown(link[1]);
-    const buyUrl = absolutizeUrl(link[2], baseUrl);
-    const image = extractMarkdownImage(segment);
-    const afterLink = segment.slice(linkIndex + 1).filter((line) => !looksLikeNoise(line));
-    const price = extractPrice(afterLink);
-    const venue = afterLink.find(
-      (line) =>
-        line !== price && !/\b(ARS|EUR|USD|free|gratis|\$)\b/i.test(line) && line.length <= 90,
-    );
-
-    return {
+    events.push({
       title,
       artist: deriveArtist(title),
-      venue: venue ? stripMarkdown(venue) : null,
+      venue,
       date,
       time,
-      price,
-      description: venue ? `Concierto en ${stripMarkdown(venue)}.` : null,
-      image_url: image,
-      buy_url: buyUrl,
+      price: null,
+      description: venue ? `Concierto en ${venue}.` : null,
+      image_url: imageMatch ? safeHttpUrl(imageMatch[1]) : null,
+      buy_url: safeHttpUrl(linkMatch[1]),
       locality: null,
-    } satisfies ScrapedEvent;
-  });
+    });
+  }
 
-  return parsed.filter((event): event is ScrapedEvent =>
-    Boolean(event?.title && event.date && event.buy_url),
-  );
+  return events.filter((e) => e.title && e.date && e.buy_url);
 }
 
 // ---------------------------------------------------------------------------

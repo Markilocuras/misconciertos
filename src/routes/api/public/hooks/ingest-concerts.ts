@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import Firecrawl from "@mendable/firecrawl-js";
 
 import { todayInBuenosAires } from "@/lib/timezone";
 import { resolveSpotifyArtistIds } from "@/lib/spotify";
@@ -10,7 +9,7 @@ import {
   type DigestRecipient,
 } from "@/lib/email.server";
 import {
-  parseAllEventsMarkdown,
+  parseAllEventsListing,
   extractAllAccessEventLinks,
   parseAllAccessEventPage,
   parseDalePlayLive,
@@ -24,8 +23,10 @@ import {
   type ScrapedEvent,
 } from "@/lib/ingest-parsers";
 
-// allevents necesita Firecrawl (listado con render); All Access y Dale Play
-// sirven HTML estático, así que se leen con fetch directo sin gastar créditos.
+// Las cuatro fuentes sirven HTML estático y se leen con fetch directo. En
+// allevents esto antes pasaba por Firecrawl, pero el listado viene renderizado
+// del server: la API key nunca estuvo configurada y la fuente no aportó una
+// sola fila hasta que se cambió por un fetch normal.
 const ALLEVENTS_SOURCES: Array<{ key: string; url: string }> = [
   { key: "allevents-concerts", url: "https://allevents.in/buenos-aires/concerts" },
   { key: "allevents-music", url: "https://allevents.in/buenos-aires/music" },
@@ -287,12 +288,40 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
         // All Access y duplicar shows que Dale Play linkea a otra ticketera.
         const { data: existingRows } = await supabaseAdmin
           .from("concerts")
-          .select("source, external_id, buy_url, slug")
+          .select("source, external_id, buy_url, slug, artist, venue, date")
           .gte("date", today);
         const knownAllAccessUrls = new Set(
           (existingRows ?? [])
             .filter((r) => r.source === "allaccess")
             .map((r) => r.external_id.split("#")[0]),
+        );
+        // allevents republica shows que ya entraron por la ticketera, y su link
+        // nunca coincide (es una URL de allevents), asi que el cruce tiene que ser
+        // por lo que de verdad identifica al show: el artista y la fecha. Un
+        // artista no toca dos veces en Buenos Aires la misma noche.
+        const artistDateKey = (artist: string, date: string) => `${slugify(artist)}|${date}`;
+        const knownArtistDates = new Set(
+          (existingRows ?? [])
+            .filter((r) => r.artist && r.date)
+            .map((r) => artistDateKey(r.artist as string, r.date as string)),
+        );
+        // Segundo cruce, para cuando ni el link ni el nombre del artista
+        // coinciden: allevents publica "YEM World Tour" donde Dale Play publica
+        // "Morat" (es la gira de su disco Ya Es Mañana). Mismo escenario la misma
+        // noche es, en la práctica, el mismo show.
+        //
+        // Es una regla estricta y a propósito se aplica solo a allevents, que es
+        // la fuente menos autoritativa: republica lo que ya venden las ticketeras.
+        // Equivocarse cuesta perder un show que solo estaba ahí; no hacerlo cuesta
+        // pines duplicados, que es peor para un mapa que se mira de un vistazo.
+        const venueDateKey = (venue: string | null, date: string): string | null => {
+          const { lat, lng } = findVenueCoords(venue);
+          return lat == null || lng == null ? null : `${lat},${lng}|${date}`;
+        };
+        const knownVenueDates = new Set(
+          (existingRows ?? [])
+            .map((r) => (r.date ? venueDateKey(r.venue, r.date) : null))
+            .filter((k): k is string => k !== null),
         );
         const buyUrlsElsewhere = new Set(
           (existingRows ?? [])
@@ -399,50 +428,50 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
           };
         }
 
-        // --- allevents.in (Firecrawl markdown) --------------------------------
-        if (process.env.FIRECRAWL_API_KEY) {
-          const firecrawl = new Firecrawl({ apiKey: process.env.FIRECRAWL_API_KEY });
-          for (const { key, url: sourceUrl } of ALLEVENTS_SOURCES) {
-            try {
-              const scrape = await firecrawl.scrape(sourceUrl, {
-                formats: ["markdown"],
-                onlyMainContent: true,
-                location: { country: "AR", languages: ["es"] },
-              });
-              const md =
-                (scrape as { markdown?: string }).markdown ??
-                (scrape as { data?: { markdown?: string } }).data?.markdown ??
-                "";
-              const events = parseAllEventsMarkdown(md, sourceUrl);
-              if (debug) {
-                results[key] = {
-                  scraped: events.length,
-                  upserted: 0,
-                  discarded: 0,
-                  parsedSample: events.slice(0, 5),
-                };
-                continue;
-              }
-              const rows = events.map((ev) =>
-                toRow("allevents", ev.buy_url ?? `${ev.title}:${ev.date}`, ev),
-              );
-              await upsert(key, rows, events.length);
-            } catch (err) {
-              console.error(`[ingest-concerts] ${key} failed`, err);
-              results[key] = {
-                scraped: 0,
-                upserted: 0,
-                discarded: 0,
-                error: err instanceof Error ? err.message : String(err),
-              };
+        // --- allevents.in (fetch directo, cards del listado) -----------------
+        try {
+          // Los dos listados se solapan casi por completo, pero cada uno trae
+          // algun evento que el otro no: se juntan y se deduplica por link.
+          const seen = new Set<string>();
+          const events: ScrapedEvent[] = [];
+          for (const { url: sourceUrl } of ALLEVENTS_SOURCES) {
+            const html = await fetchHtml(sourceUrl);
+            for (const ev of parseAllEventsListing(html)) {
+              if (!ev.buy_url || seen.has(ev.buy_url)) continue;
+              seen.add(ev.buy_url);
+              events.push(ev);
             }
           }
-        } else {
+
+          const fresh = events.filter((ev) => {
+            if (!ev.date) return true;
+            if (ev.artist && knownArtistDates.has(artistDateKey(ev.artist, ev.date))) return false;
+            const key = venueDateKey(ev.venue, ev.date);
+            return !(key && knownVenueDates.has(key));
+          });
+          const skipped = events.length - fresh.length;
+
+          if (debug) {
+            results["allevents"] = {
+              scraped: events.length,
+              upserted: 0,
+              discarded: 0,
+              skipped,
+              parsedSample: fresh.slice(0, 5),
+            };
+          } else {
+            const rows = fresh.map((ev) =>
+              toRow("allevents", ev.buy_url ?? `${ev.title}:${ev.date}`, ev),
+            );
+            await upsert("allevents", rows, fresh.length, skipped);
+          }
+        } catch (err) {
+          console.error("[ingest-concerts] allevents failed", err);
           results["allevents"] = {
             scraped: 0,
             upserted: 0,
             discarded: 0,
-            error: "FIRECRAWL_API_KEY not configured; skipped",
+            error: err instanceof Error ? err.message : String(err),
           };
         }
 
