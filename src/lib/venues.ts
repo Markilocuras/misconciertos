@@ -42,6 +42,9 @@ export const VENUE_COORDS: Record<string, { lat: number; lng: number }> = {
   "art media": { lat: -34.5906, lng: -58.4479 },
   "estadio unico": { lat: -34.9138, lng: -57.989 },
   "campo argentino de polo": { lat: -34.5746, lng: -58.4131 },
+  // Dale Play lo lista como "Campo de Polo" a secas, y el match es por
+  // substring: sin este alias esa forma no entra.
+  "campo de polo": { lat: -34.5746, lng: -58.4131 },
   "hipodromo de palermo": { lat: -34.5687, lng: -58.4263 },
   "hipodromo argentino de palermo": { lat: -34.5687, lng: -58.4263 },
   "estadio river plate": { lat: -34.5453, lng: -58.4498 },
@@ -79,8 +82,21 @@ export const VENUE_COORDS: Record<string, { lat: number; lng: number }> = {
   "estadio ferro": { lat: -34.6187, lng: -58.4472 },
   "ferro carril oeste": { lat: -34.6187, lng: -58.4472 },
   "auditorio belgrano": { lat: -34.567, lng: -58.4495 },
+  // Ídem: Ticketek escribe "Auditorio de Belgrano".
+  "auditorio de belgrano": { lat: -34.567, lng: -58.4495 },
   uniclub: { lat: -34.6029, lng: -58.4121 },
   "la tangente": { lat: -34.5876, lng: -58.4325 },
+  // Agregados el 30/08/2026: estaban llegando del scraping y se
+  // descartaban por no tener coordenada. Todos verificados en OSM.
+  // Av. Lincoln 3815, Villa Devoto.
+  "teatro devoto": { lat: -34.5998, lng: -58.5081 },
+  // Predio de Villa Soldati, ex Interama.
+  "parque de la ciudad": { lat: -34.6714, lng: -58.4503 },
+  // Estadio Mary Terán de Weiss, Av. Coronel Roca, Villa Soldati.
+  "parque roca": { lat: -34.6772, lng: -58.4462 },
+  "mary teran de weiss": { lat: -34.6772, lng: -58.4462 },
+  // Campus de San Justo, La Matanza.
+  "universidad nacional de la matanza": { lat: -34.6672, lng: -58.5664 },
 };
 
 // "Teatro Ópera", "Vélez", "Tecnópolis" → sin acentos ni mayúsculas, para que

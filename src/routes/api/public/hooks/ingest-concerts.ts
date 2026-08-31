@@ -104,8 +104,17 @@ function toRow(source: string, externalId: string, ev: ScrapedEvent): ConcertRow
 
 // Sólo guardamos shows futuros con venue geolocalizable (el mapa es de CABA:
 // un venue fuera de la tabla de coordenadas queda descartado a propósito).
-function keepRow(row: ConcertRowInsert, today: string): boolean {
-  return Boolean(row.title && row.date && row.date >= today && row.lat != null && row.lng != null);
+// Motivo por el que una fila scrapeada no llega a la base. Interesa
+// distinguirlos: "noCoords" es el único accionable, porque son eventos reales
+// de Buenos Aires cuyo venue todavía no está en VENUE_COORDS. Los otros dos son
+// descartes correctos (el evento ya pasó, o vino incompleto de la fuente).
+type DiscardReason = "noTitleOrDate" | "pastDate" | "noCoords";
+
+function discardReason(row: ConcertRowInsert, today: string): DiscardReason | null {
+  if (!row.title || !row.date) return "noTitleOrDate";
+  if (row.date < today) return "pastDate";
+  if (row.lat == null || row.lng == null) return "noCoords";
+  return null;
 }
 
 // Le pega el id de artista de Spotify a las filas que se van a guardar, para
@@ -139,6 +148,13 @@ type SourceReport = {
   upserted: number;
   discarded: number;
   skipped?: number;
+  // Desglose de `discarded`. Sin esto un venue que falta en VENUE_COORDS se cae
+  // en silencio, que es como estuvimos perdiendo shows durante semanas sin
+  // enterarnos: el contador subía pero no decía de qué.
+  discardedBy?: Record<DiscardReason, number>;
+  // Los venues concretos que hay que agregar a VENUE_COORDS. Es la lista de
+  // trabajo: cada nombre acá es un evento que se está perdiendo.
+  unknownVenues?: string[];
   error?: string;
   parsedSample?: ScrapedEvent[];
 };
@@ -323,7 +339,33 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
           scraped: number,
           skipped = 0,
         ) {
-          const kept = dedupeByExternalId(rows.filter((r) => keepRow(r, today)));
+          // Clasificamos los descartes antes de deduplicar, para poder decir
+          // qué se cayó y por qué. Los venues desconocidos además van al log
+          // del Worker: son los que hay que agregar a VENUE_COORDS a mano.
+          const usable: ConcertRowInsert[] = [];
+          const discardedBy: Record<DiscardReason, number> = {
+            noTitleOrDate: 0,
+            pastDate: 0,
+            noCoords: 0,
+          };
+          const unknownVenues = new Set<string>();
+          for (const row of rows) {
+            const reason = discardReason(row, today);
+            if (!reason) {
+              usable.push(row);
+              continue;
+            }
+            discardedBy[reason] += 1;
+            if (reason === "noCoords" && row.venue) unknownVenues.add(row.venue);
+          }
+          if (unknownVenues.size > 0) {
+            console.warn(
+              `[ingest-concerts] ${sourceKey}: ${unknownVenues.size} venue(s) sin coordenadas, ` +
+                `${discardedBy.noCoords} evento(s) perdidos -> ${[...unknownVenues].join(" | ")}`,
+            );
+          }
+
+          const kept = dedupeByExternalId(usable);
           assignSlugs(kept);
           await attachSpotifyArtistIds(kept);
           if (kept.length > 0) {
@@ -351,6 +393,8 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
             upserted: kept.length,
             discarded: scraped - kept.length,
             ...(skipped ? { skipped } : {}),
+            ...(Object.values(discardedBy).some((n) => n > 0) ? { discardedBy } : {}),
+            ...(unknownVenues.size > 0 ? { unknownVenues: [...unknownVenues].sort() } : {}),
           };
         }
 
