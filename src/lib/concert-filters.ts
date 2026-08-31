@@ -5,18 +5,15 @@ import type { Concert } from "@/data/concerts";
 
 export type Coords = { lat: number; lng: number };
 
+// Fecha local del navegador, no UTC. `toISOString()` da UTC y en Buenos Aires
+// (UTC-3) eso ya es mañana a partir de las 21hs: los chips marcarían el día
+// equivocado toda la noche, justo cuando alguien busca a qué ir. Para el "hoy"
+// del lado del server está todayInBuenosAires() en @/lib/timezone.
 function toIsoDate(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
-}
-
-// Fecha local, no UTC. `toISOString()` da UTC y en Buenos Aires (UTC-3) eso ya
-// es mañana a partir de las 21hs: "Hoy" marcaría el día equivocado toda la
-// noche, justo cuando alguien busca a qué ir.
-export function todayIso(now: Date = new Date()): string {
-  return toIsoDate(now);
 }
 
 function addDays(iso: string, days: number): string {

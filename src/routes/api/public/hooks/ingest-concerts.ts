@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import Firecrawl from "@mendable/firecrawl-js";
 
+import { todayInBuenosAires } from "@/lib/timezone";
 import { resolveSpotifyArtistIds } from "@/lib/spotify";
 import { findVenueCoords } from "@/lib/venues";
 import {
@@ -200,7 +201,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
 
         const url = new URL(request.url);
         const debug = url.searchParams.get("debug") === "1";
-        const today = new Date().toISOString().slice(0, 10);
+        const today = todayInBuenosAires();
         const results: Record<string, SourceReport> = {};
 
         // El upsert solo le pone el id de Spotify a lo que vuelve a aparecer en
