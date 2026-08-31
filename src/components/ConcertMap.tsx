@@ -75,6 +75,27 @@ const FOCUS_ZOOM = 14;
 // ver qué recitales te rodean, no el bloque en el que estás parado.
 const NEARBY_ZOOM = 13;
 
+// Carto empezó a exigir API key en sus basemaps raster: los tiles pedidos sin
+// clave vuelven con "API KEY REQUIRED" quemado encima de la imagen. La key es
+// gratis y se pide en https://carto.com/basemaps/apikey (5M tiles por mes, sin
+// cuenta, uso comercial permitido).
+//
+// Vite resuelve import.meta.env en build time, así que VITE_CARTO_API_KEY tiene
+// que estar en .env ANTES de correr el build, igual que GA_ENABLED en
+// analytics.ts. Sin la key el mapa igual funciona: vuelve la marca de agua.
+//
+// Carto tiene los raster en vía de retiro y empuja a los vectoriales, que en
+// Leaflet necesitan maplibre. Cuando eso pase hay que migrar acá.
+const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY;
+const TILE_URL =
+  "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" +
+  (CARTO_API_KEY ? `?key=${CARTO_API_KEY}` : "");
+
+// Los términos de Carto piden acreditar a Carto y a OpenStreetMap en cada mapa.
+const TILE_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> ' +
+  '&copy; <a href="https://carto.com/attributions">CARTO</a>';
+
 // Leaflet interpola el vuelo dividiendo por el tamaño del contenedor: si el
 // mapa todavía no tiene alto o ancho (se montó antes de que el layout se lo
 // diera), las cuentas dan NaN y tira "Invalid LatLng object: (NaN, NaN)".
@@ -242,10 +263,7 @@ export function ConcertMap({ concerts, selectedId, onSelect, userPosition = null
       style={{ height: "100%", width: "100%" }}
       className="z-0"
     >
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-      />
+      <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
       <GroupMarkers groups={groups} selectedId={selectedId} onSelect={onSelect} />
       {userPosition && (
         // No interactivo y por debajo de los pines: es una referencia, y no
