@@ -3,10 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   deriveArtist,
   extractAllAccessEventLinks,
+  parseAllAccessEventPage,
   normalizeDate,
   parseAllEventsListing,
   parseDalePlayLive,
   parseTicketekMusicList,
+  parseLivePassEventLinks,
+  parseLivePassEventPage,
+  isBuenosAiresRegion,
   slugify,
 } from "@/lib/ingest-parsers";
 
@@ -127,6 +131,43 @@ describe("extractAllAccessEventLinks", () => {
   });
 });
 
+describe("parseAllAccessEventPage", () => {
+  const ev = parseAllAccessEventPage(
+    fixture("allaccess-evento.html"),
+    "https://www.allaccess.com.ar/event/jamiroquai",
+  );
+
+  it("saca el evento del JSON-LD de la ficha", () => {
+    expect(ev).toMatchObject({
+      title: "Jamiroquai",
+      artist: "Jamiroquai",
+      venue: "Hipodromo de San Isidro",
+      date: "2026-09-18",
+      price: "ARS 95.000",
+      locality: "San Isidro, Buenos Aires",
+    });
+    expect(ev?.image_url).toMatch(/^https:\/\//);
+  });
+
+  it("trata la medianoche como 'sin horario'", () => {
+    // All Access publica startDate con T00:00:00Z cuando todavía no anunció la
+    // hora. Mostrar "00:00" en la ficha sería peor que no mostrar nada.
+    expect(ev?.time).toBeNull();
+  });
+
+  it("descarta la ficha que no publica fecha", () => {
+    // Caso real: la página de Lollapalooza 2027 tiene su Event en el JSON-LD
+    // pero sin startDate, porque todavía no anunciaron las fechas. Sin fecha no
+    // hay nada que poner en el mapa.
+    expect(
+      parseAllAccessEventPage(
+        fixture("allaccess-evento-sin-fecha.html"),
+        "https://www.allaccess.com.ar/event/lollapalooza-2027",
+      ),
+    ).toBeNull();
+  });
+});
+
 describe("parseDalePlayLive", () => {
   const eventos = parseDalePlayLive(fixture("daleplay-live.html"));
 
@@ -169,6 +210,93 @@ describe("parseTicketekMusicList", () => {
     expect(parseTicketekMusicList(null)).toEqual([]);
     expect(parseTicketekMusicList({})).toEqual([]);
     expect(parseTicketekMusicList({ widgets: "no soy un objeto" })).toEqual([]);
+  });
+});
+
+describe("parseLivePassEventLinks", () => {
+  const links = parseLivePassEventLinks(fixture("livepass-listado.html"));
+
+  it("saca los links del listado, absolutos y sin repetir", () => {
+    // El listado repite cada evento en varios carruseles: sin deduplicar,
+    // salen 102 links para 86 eventos y se gastan fetches al pedo.
+    expect(links).toHaveLength(86);
+    expect(new Set(links).size).toBe(links.length);
+    for (const l of links) expect(l).toMatch(/^https:\/\/livepass\.com\.ar\/events\//);
+  });
+});
+
+describe("parseLivePassEventPage", () => {
+  const caba = parseLivePassEventPage(fixture("livepass-caba.html"), "https://livepass.com.ar/x");
+  const provincia = parseLivePassEventPage(
+    fixture("livepass-provincia.html"),
+    "https://livepass.com.ar/x",
+  );
+
+  it("saca todo del JSON-LD, incluida la coordenada", () => {
+    expect(provincia).toMatchObject({
+      artist: "1915 + MUJER CEBRA + TERRORES NOCTURNOS",
+      venue: "XLR Club",
+      date: "2026-10-03",
+      time: "20:00",
+      price: "ARS 23.000",
+      locality: "San Miguel",
+      region: "Provincia de Buenos Aires",
+      lat: -34.5350757,
+      lng: -58.7067181,
+    });
+  });
+
+  it("lee el precio aunque venga como una oferta suelta y no como lista", () => {
+    // Live Pass manda un AggregateOffer solo, no un array. Cuando el parser
+    // asumía lista, esto tiraba "ev.offers.map is not a function" y se caía la
+    // fuente entera.
+    expect(caba?.price).toBe("ARS 138.000");
+  });
+
+  it("limpia los signos de pregunta con los que Live Pass pisa los caracteres especiales", () => {
+    // El JSON-LD publica "A PERFECT CIRCLE + PUSCIFER?en Buenos Aires". Sin
+    // limpiarlo, deriveArtist no encuentra el " en " y el artista termina
+    // siendo el título entero.
+    expect(caba?.title).toBe("A PERFECT CIRCLE + PUSCIFER en Buenos Aires");
+    expect(caba?.artist).toBe("A PERFECT CIRCLE + PUSCIFER");
+  });
+
+  it("prefiere la url del JSON-LD antes que la de la página", () => {
+    expect(caba?.buy_url).toBe("https://livepass.com.ar/events/a-perfect-circle");
+  });
+
+  it("devuelve null si la página no trae un Event", () => {
+    expect(parseLivePassEventPage("<html></html>", "https://livepass.com.ar/x")).toBeNull();
+  });
+});
+
+describe("isBuenosAiresRegion", () => {
+  it("acepta las tres formas en que Live Pass escribe Buenos Aires", () => {
+    // La misma provincia aparece escrita de tres maneras, y "Buenos Aires" a
+    // secas se usa tanto para CABA como para La Plata: no sirve para separar
+    // ciudad de provincia, solo para saber que es Buenos Aires.
+    expect(isBuenosAiresRegion("Ciudad Autónoma de Buenos Aires")).toBe(true);
+    expect(isBuenosAiresRegion("Provincia de Buenos Aires")).toBe(true);
+    expect(isBuenosAiresRegion("Buenos Aires")).toBe(true);
+    expect(isBuenosAiresRegion("CABA")).toBe(true);
+    expect(isBuenosAiresRegion("Capital Federal")).toBe(true);
+  });
+
+  it("deja afuera el resto del país", () => {
+    for (const region of ["Córdoba", "Neuquén", "Mendoza", "Santa Fe", "Río Negro"]) {
+      expect(isBuenosAiresRegion(region), region).toBe(false);
+    }
+    expect(isBuenosAiresRegion(null)).toBe(false);
+    expect(isBuenosAiresRegion("")).toBe(false);
+  });
+
+  it("filtra de verdad una página de otra provincia", () => {
+    const fuera = parseLivePassEventPage(
+      fixture("livepass-fuera.html"),
+      "https://livepass.com.ar/x",
+    );
+    expect(fuera?.venue).toBe("Estadio Julio César Villagra");
+    expect(isBuenosAiresRegion(fuera?.region)).toBe(false);
   });
 });
 
