@@ -15,10 +15,15 @@ Package manager is **bun** (`bun.lock`, `bunfig.toml`) — use `bun`, not `npm`/
 - `bun run build` — production build (`vite build`)
 - `bun run build:dev` — development-mode build
 - `bun run preview` — preview a production build
+- `bun run test` — Vitest, una pasada (`vitest run`); `bun run test:watch` para el modo watch
 - `bun run lint` — ESLint (flat config, `eslint.config.js`)
 - `bun run format` — Prettier write (`.prettierrc`: 100 width, double quotes off i.e. `"`, trailing commas)
 
-There is no test suite/framework configured in this repo currently.
+**Tests**: Vitest, en `test/`, con su propia `vitest.config.ts` (mínima a propósito: `vite.config.ts` arma toda la app con nitro y el plugin de TanStack, y nada de eso hace falta para funciones puras). Cubren los parsers de la ingesta, el matching de `VENUE_COORDS` y el cálculo de "hoy" en hora argentina.
+
+Los fixtures de `test/fixtures/` son la respuesta real de cada fuente, congelada. Cubren que nadie rompa un parser desde adentro; **no** avisan si la fuente cambia su HTML mañana, porque un fixture congelado no se entera de eso. Para eso hace falta mirar lo que devuelve la corrida real (ver `discardedBy`/`unknownVenues` más abajo).
+
+La suite corre con `TZ=UTC` a propósito, igual que el Worker en Cloudflare. Sin eso, en una máquina que ya está en `America/Argentina/Buenos_Aires` los tests de huso horario pasan aunque el código no fuerce la zona.
 
 `bunfig.toml` enforces a 24h supply-chain guard (`minimumReleaseAge`) blocking newly-published package versions. Adding a package to `minimumReleaseAgeExcludes` bypasses that guard — confirm with the user before adding any entry there.
 
@@ -76,8 +81,12 @@ Build output goes to **`.output/`**, not `dist/` — `.output/server/index.mjs` 
 - `public.saved_concerts` — per-user, all three policies scoped to `auth.uid() = user_id`.
 - `public.artist_alerts` — email subscriptions; anon INSERT, SELECT limited to admins via `has_role()`. (Lovable's review claims this table has no SELECT policy; it does.)
 
-**Ingest pipeline** (`src/routes/api/public/hooks/ingest-concerts.ts`): scheduled/cron-triggered POST, authenticated via the `cron_secrets` "ingest" value (not the anon key). Scrapes a fixed list of Buenos Aires event-listing URLs with Firecrawl (`formats: ["markdown"]`), hand-parses the markdown into events (date/time/price/venue heuristics, Spanish+English month names), resolves venue lat/lng from a hardcoded `VENUE_COORDS` table, discards anything without a title/future date/coordinates, then upserts into `concerts`. Supports `?debug=1` to return raw scrape samples without writing to the DB.
+**Ingest pipeline** (`src/routes/api/public/hooks/ingest-concerts.ts`): scheduled/cron-triggered POST, authenticated via the `cron_secrets` "ingest" value (not the anon key). Las cuatro fuentes —allevents.in, allaccess.com.ar, daleplay.la y la API CMS de ticketek.com.ar— se leen con `fetch` directo y se parsean con las funciones puras de `src/lib/ingest-parsers.ts`. Resuelve lat/lng contra la tabla `VENUE_COORDS` de `src/lib/venues.ts`, descarta lo que no tenga título, fecha futura o coordenadas, y hace upsert en `concerts`. Soporta `?debug=1` para devolver lo parseado sin escribir, y `?spotify=1` para el backfill de ids de Spotify, que corre en su propia invocación.
 
-**Env vars**: client-visible ones are `VITE_`-prefixed (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`); server-only equivalents are unprefixed (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_PROJECT_ID`) plus `SUPABASE_SERVICE_ROLE_KEY` and `FIRECRAWL_API_KEY`, which live in Cloudflare Worker secrets rather than the local `.env`.
+Cada fuente reporta `scraped`/`upserted`/`discarded`/`skipped`, más `discardedBy` (por qué se cayó cada fila) y `unknownVenues` (los venues que faltan cargar en `VENUE_COORDS`). Ese reporte es hoy la única forma de enterarse de que una fuente se rompió, así que conviene mirarlo: un `scraped: 0` sin `error` normalmente significa que la fuente cambió su HTML.
+
+**El presupuesto de subrequests es el límite real de la ingesta.** Cloudflare corta la invocación a los 50, y una corrida normal ya raspa ese techo: cuando se pasa, las fuentes que corren últimas traen 0 y el mail de aviso falla, todo en silencio. Por eso la resolución de ids de Spotify salió del camino de la ingesta (la hace el cron `spotify-backfill-daily`) y por eso allaccess y ticketek tienen topes de fetches por corrida. Antes de sumar una quinta fuente hay que partir la ingesta en una invocación por fuente.
+
+**Env vars**: client-visible ones are `VITE_`-prefixed (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`); server-only equivalents are unprefixed (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_PROJECT_ID`) plus `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY` y `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET`, que viven en los secrets del Worker y no en el `.env` local. `VITE_CARTO_API_KEY` es la clave de los basemaps de Carto: Vite la resuelve en build time, así que tiene que estar en `.env` **antes** de buildear o el mapa sale con la marca de agua de "API KEY REQUIRED".
 
 **Path alias**: `@/*` → `src/*` (see `tsconfig.json`, `components.json`).
