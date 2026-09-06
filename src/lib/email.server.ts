@@ -3,6 +3,7 @@ import { SITE_URL } from "@/lib/site";
 // Envío de mails vía Resend. Server-only: la API key vive en los secrets del
 // Worker, nunca en el bundle del cliente.
 const RESEND_BATCH_ENDPOINT = "https://api.resend.com/emails/batch";
+const RESEND_ENDPOINT = "https://api.resend.com/emails";
 const FROM = "misconciertos <avisos@misconciertos.com.ar>";
 
 // Límite de la API de Resend para /emails/batch.
@@ -164,4 +165,95 @@ export async function sendNewConcertsDigest(
   }
 
   return { sent, failed, ...(firstError ? { error: firstError } : {}) };
+}
+
+// ---------------------------------------------------------------------------
+// Aviso de fuente caída
+//
+// Las fuentes se rompen calladas: cambian una clase del HTML, el parser deja de
+// encontrar nada y la ingesta sigue devolviendo 200. Así ticketek estuvo un mes
+// sin traer un solo show y allevents no aportó nunca una fila, y en los dos
+// casos nos enteramos por casualidad, mirando por qué el mapa se sentía viejo.
+// ---------------------------------------------------------------------------
+
+export type FuenteCaida = {
+  source: string;
+  /** Ítems que el parser sacó del listado. Cero es la señal de que se rompió. */
+  found: number;
+  error?: string;
+};
+
+export type AlertResult = { sent: boolean; error?: string };
+
+function alertaHtml(fuentes: FuenteCaida[]): string {
+  const filas = fuentes
+    .map((f) => {
+      const motivo = f.error
+        ? `falló con: ${escapeHtml(f.error)}`
+        : "respondió bien pero el parser no encontró ningún evento";
+      return `<li style="margin-bottom:10px"><strong>${escapeHtml(f.source)}</strong> — ${motivo}</li>`;
+    })
+    .join("");
+
+  return `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;color:#1a1a24">
+    <h2 style="font-size:18px;margin:0 0 4px">Una fuente de conciertos dejó de traer datos</h2>
+    <p style="color:#666;font-size:14px;margin:0 0 16px">Corrida de la ingesta en ${escapeHtml(SITE_URL)}</p>
+    <ul style="font-size:15px;padding-left:20px;margin:0 0 20px">${filas}</ul>
+    <p style="font-size:14px;line-height:1.5;color:#333">
+      Cuando una fuente responde bien pero no devuelve eventos, casi siempre cambió su HTML
+      y el parser dejó de matchear. Para ver qué está llegando:
+    </p>
+    <pre style="background:#f4f4f6;padding:10px;border-radius:6px;font-size:12px;overflow-x:auto">POST ${escapeHtml(SITE_URL)}/api/public/hooks/ingest-concerts?debug=1</pre>
+    <p style="font-size:13px;color:#888">Ese modo parsea todo y devuelve una muestra, sin escribir en la base.</p>
+  </div>`;
+}
+
+function alertaTexto(fuentes: FuenteCaida[]): string {
+  const filas = fuentes
+    .map(
+      (f) =>
+        `- ${f.source}: ${f.error ? `falló con: ${f.error}` : "respondió bien pero el parser no encontró ningún evento"}`,
+    )
+    .join("\n");
+  return [
+    "Una fuente de conciertos dejó de traer datos.",
+    "",
+    filas,
+    "",
+    "Cuando una fuente responde bien pero no devuelve eventos, casi siempre cambió su HTML.",
+    `Para ver qué está llegando: POST ${SITE_URL}/api/public/hooks/ingest-concerts?debug=1`,
+    "(ese modo parsea todo y devuelve una muestra, sin escribir en la base)",
+  ].join("\n");
+}
+
+export async function sendIngestAlert(
+  apiKey: string,
+  to: string,
+  fuentes: FuenteCaida[],
+): Promise<AlertResult> {
+  if (fuentes.length === 0) return { sent: false };
+
+  const nombres = fuentes.map((f) => f.source).join(", ");
+  try {
+    const res = await fetch(RESEND_ENDPOINT, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: FROM,
+        to: [to],
+        subject: `misconciertos — sin datos de ${nombres}`,
+        html: alertaHtml(fuentes),
+        text: alertaTexto(fuentes),
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.error("[email] alerta de ingesta falló", res.status, body.slice(0, 500));
+      return { sent: false, error: `resend ${res.status}: ${body.slice(0, 200)}` };
+    }
+    return { sent: true };
+  } catch (err) {
+    console.error("[email] alerta de ingesta tiró", err);
+    return { sent: false, error: err instanceof Error ? err.message : String(err) };
+  }
 }

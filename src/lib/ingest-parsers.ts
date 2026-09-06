@@ -12,6 +12,12 @@ export type ScrapedEvent = {
   image_url: string | null;
   buy_url: string | null;
   locality: string | null; // ciudad según la fuente, si la publica
+  // Live Pass publica la coordenada del venue en su JSON-LD. Cuando viene, es
+  // mejor que VENUE_COORDS: no depende de que alguien haya cargado el lugar a
+  // mano, así que funciona con salas que la tabla no conoce.
+  lat?: number | null;
+  lng?: number | null;
+  region?: string | null; // provincia según la fuente, si la publica
 };
 
 const MONTHS: Record<string, number> = {
@@ -235,9 +241,12 @@ type JsonLdEvent = {
   url?: string;
   location?: {
     name?: string;
-    address?: { addressLocality?: string };
+    address?: { addressLocality?: string; addressRegion?: string };
+    geo?: { latitude?: string | number; longitude?: string | number };
   };
-  offers?: Array<{ price?: number | string }>;
+  // schema.org permite una oferta o varias, y las fuentes usan las dos: All
+  // Access manda una lista de Offer y Live Pass un AggregateOffer suelto.
+  offers?: { price?: number | string } | Array<{ price?: number | string }>;
 };
 
 function extractJsonLdBlocks(html: string): unknown[] {
@@ -256,6 +265,11 @@ function extractJsonLdBlocks(html: string): unknown[] {
   return parsed;
 }
 
+function comoLista<T>(input: T | T[] | null | undefined): T[] {
+  if (input == null) return [];
+  return Array.isArray(input) ? input : [input];
+}
+
 function extractOgImage(html: string): string | null {
   const m = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
   return m ? safeHttpUrl(m[1]) : null;
@@ -270,11 +284,12 @@ export function parseAllAccessEventPage(html: string, pageUrl: string): ScrapedE
   // publicar hora local aunque marquen "Z").
   const date = normalizeDate(ev.startDate);
   const timeMatch = ev.startDate.match(/T(\d{2}):(\d{2})/);
-  const time = timeMatch && `${timeMatch[1]}:${timeMatch[2]}` !== "00:00"
-    ? `${timeMatch[1]}:${timeMatch[2]}`
-    : null;
+  const time =
+    timeMatch && `${timeMatch[1]}:${timeMatch[2]}` !== "00:00"
+      ? `${timeMatch[1]}:${timeMatch[2]}`
+      : null;
 
-  const prices = (ev.offers ?? [])
+  const prices = comoLista(ev.offers)
     .map((o) => Number(o.price))
     .filter((p) => Number.isFinite(p) && p > 0);
   const price = prices.length ? formatArsPrice(Math.min(...prices)) : null;
@@ -314,9 +329,7 @@ export function parseDalePlayLive(html: string): ScrapedEvent[] {
 
   for (const card of cards) {
     const titleMatch = card.match(/events__grid__item__top__title[^>]*>\s*([^<]+?)\s*</);
-    const imageMatch = card.match(
-      /<img[^>]+class="events__grid__item__top__bg"[^>]+src="([^"]+)"/,
-    );
+    const imageMatch = card.match(/<img[^>]+class="events__grid__item__top__bg"[^>]+src="([^"]+)"/);
     if (!titleMatch) continue;
     const artist = decodeHtmlEntities(titleMatch[1]);
     const image = imageMatch ? safeHttpUrl(imageMatch[1]) : null;
@@ -496,4 +509,108 @@ export function parseTicketekShow(json: unknown): TicketekPerformance[] {
     const min = available.length ? Math.min(...available) : all.length ? Math.min(...all) : null;
     return { date, time, price: min ? formatArsPrice(min) : null };
   });
+}
+
+// ---------------------------------------------------------------------------
+// livepass.com.ar — el listado sirve solo links y fechas (el título viene
+// truncado y no dice el lugar), pero cada página de evento publica un JSON-LD
+// completo: nombre, fecha con hora, venue, localidad, provincia y coordenadas.
+// ---------------------------------------------------------------------------
+
+const LIVEPASS_SITE = "https://livepass.com.ar";
+
+export function parseLivePassEventLinks(html: string): string[] {
+  const links: string[] = [];
+  const vistos = new Set<string>();
+  for (const m of html.matchAll(/href="(\/events\/[^"#?]+)"/g)) {
+    const url = LIVEPASS_SITE + m[1];
+    if (vistos.has(url)) continue;
+    vistos.add(url);
+    links.push(url);
+  }
+  return links;
+}
+
+function sinAcentos(input: string): string {
+  return input.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * Si la provincia que publica la fuente es Buenos Aires (provincia o ciudad).
+ * Live Pass vende en todo el país y el mapa es de Buenos Aires, así que sin
+ * este filtro entran shows de Córdoba, Neuquén o Mendoza.
+ *
+ * Escribe la misma provincia de tres formas distintas —"Buenos Aires",
+ * "Provincia de Buenos Aires" y "Ciudad Autónoma de Buenos Aires"— y ninguna
+ * distingue CABA de provincia de manera confiable: hay eventos de La Plata
+ * marcados como "Buenos Aires" a secas. Por eso se aceptan las dos.
+ */
+export function isBuenosAiresRegion(region: string | null | undefined): boolean {
+  if (!region) return false;
+  const r = sinAcentos(region);
+  if (/\b(caba|capital federal)\b/.test(r)) return true;
+  return r.includes("buenos aires");
+}
+
+// Live Pass manda los títulos de evento con los caracteres especiales pisados
+// por "?": publica "A PERFECT CIRCLE + PUSCIFER?en Buenos Aires" y
+// "Giant Rooks?en Vorterix". Es un defecto de ellos —los nombres de venue del
+// mismo JSON-LD vienen con los acentos bien— pero nos rompe deriveArtist, que
+// corta por " en " con espacios: sin limpiar, el artista termina siendo el
+// título entero.
+//
+// Un "?" de verdad va seguido de espacio o cierra el texto. Uno pegado a la
+// palabra siguiente es basura, y se cambia por el espacio que le falta.
+function limpiarInterrogantesRotos(title: string): string {
+  return title
+    .replace(/\?(?=\S)/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function coordenada(input: unknown): number | null {
+  const n = typeof input === "string" ? Number(input) : typeof input === "number" ? input : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+
+export function parseLivePassEventPage(html: string, pageUrl: string): ScrapedEvent | null {
+  const items = extractJsonLdBlocks(html) as JsonLdEvent[];
+  const ev = items.find((i) => i && /event/i.test(String(i["@type"] ?? "")));
+  if (!ev?.name || !ev.startDate) return null;
+
+  const date = normalizeDate(ev.startDate);
+  const timeMatch = ev.startDate.match(/T(\d{2}):(\d{2})/);
+  const time =
+    timeMatch && `${timeMatch[1]}:${timeMatch[2]}` !== "00:00"
+      ? `${timeMatch[1]}:${timeMatch[2]}`
+      : null;
+
+  const prices = comoLista(ev.offers)
+    .map((o) => Number(o.price))
+    .filter((p) => Number.isFinite(p) && p > 0);
+
+  const jsonImage = Array.isArray(ev.image) ? ev.image[0] : ev.image;
+  const venue = ev.location?.name ?? null;
+  const title = limpiarInterrogantesRotos(decodeHtmlEntities(ev.name));
+
+  return {
+    title,
+    artist: deriveArtist(title),
+    venue,
+    date,
+    time,
+    price: prices.length ? formatArsPrice(Math.min(...prices)) : null,
+    description:
+      ev.description && ev.description !== ev.name
+        ? decodeHtmlEntities(ev.description)
+        : venue
+          ? `Concierto en ${venue}.`
+          : null,
+    image_url: safeHttpUrl(jsonImage ?? null) ?? extractOgImage(html),
+    buy_url: safeHttpUrl(ev.url) ?? pageUrl,
+    locality: ev.location?.address?.addressLocality ?? null,
+    lat: coordenada(ev.location?.geo?.latitude),
+    lng: coordenada(ev.location?.geo?.longitude),
+    region: ev.location?.address?.addressRegion ?? null,
+  };
 }
