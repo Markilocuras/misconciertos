@@ -3,6 +3,14 @@
 # marca un error por línea en cada archivo.
 * text=auto eol=lf
 
+# Fixtures de test: son la respuesta cruda de cada fuente y valen justamente por
+# ser byte a byte lo que sirvió el servidor. Si git les normaliza los saltos de
+# línea dejan de ser una foto fiel, y un parser que mañana dependa de 
+
+# pasaría los tests acá y fallaría en producción. -diff además evita volcar
+# 400 KB de HTML en la terminal cada vez que se refrescan.
+test/fixtures/** -text -diff
+
 # Binarios: que git no toque los saltos de línea.
 *.png binary
 *.jpg binary
