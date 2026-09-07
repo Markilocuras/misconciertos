@@ -15,6 +15,7 @@ import {
   isBuenosAiresRegion,
   parseLivePassEventLinks,
   parseLivePassEventPage,
+  pareceNoMusical,
   extractAllAccessEventLinks,
   parseAllAccessEventPage,
   parseDalePlayLive,
@@ -703,6 +704,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
 
           const events: ScrapedEvent[] = [];
           let fueraDeZona = 0;
+          let noMusicales = 0;
           for (const link of toFetch) {
             try {
               const ev = parseLivePassEventPage(await fetchHtml(link), link);
@@ -711,6 +713,13 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
               // Aires: sin el filtro entran Córdoba, Neuquén y compañía.
               if (!isBuenosAiresRegion(ev.region)) {
                 fueraDeZona += 1;
+                continue;
+              }
+              // Y vende de todo, no solo música: su listado mezcla recitales con
+              // teatro, ballet y stand-up. Ver pareceNoMusical, que es un colador
+              // y no un filtro: algo se va a colar igual.
+              if (pareceNoMusical(ev.title)) {
+                noMusicales += 1;
                 continue;
               }
               events.push(ev);
@@ -722,7 +731,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
           // Lo salteado son los links que no se miraron en esta corrida: los que
           // ya estaban más los que quedaron fuera del tope, más los que se
           // abrieron y resultaron ser de otra provincia.
-          const skipped = links.length - toFetch.length + fueraDeZona;
+          const skipped = links.length - toFetch.length + fueraDeZona + noMusicales;
 
           if (debug) {
             results["livepass"] = {
