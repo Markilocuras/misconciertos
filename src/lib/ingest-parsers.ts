@@ -601,6 +601,35 @@ const TERMINOS_NO_MUSICALES = [
   "programas de",
 ];
 
+/**
+ * Eventos puntuales de Live Pass que no son musicales y que el título no delata.
+ *
+ * Es una lista a mano, y esta vez es la herramienta correcta: son producciones
+ * concretas —una obra, una despedida de ballet— que ninguna regla automática
+ * puede distinguir de un recital, porque la diferencia no está escrita en
+ * ningún lado del HTML.
+ *
+ * Va por slug y no por título por dos motivos: una misma obra vuelve con varias
+ * fechas y todas comparten el slug base, y el slug no cambia si le retocan el
+ * título.
+ *
+ * Importa que exista aparte del filtro por palabras: borrar la fila de la base
+ * no alcanza para sacar un evento del mapa. La ingesta arma su lista de
+ * "conocidos" leyendo la base, así que al borrar una fila el link vuelve a
+ * contar como nuevo y la corrida siguiente lo levanta de nuevo. Sin esta lista,
+ * borrar es tirar agua al mar.
+ */
+const SLUGS_NO_MUSICALES = [
+  "autos-robados",
+  "inaki-urlezaga",
+  "hecatombe-mi-primera-guerra-mundial",
+];
+
+export function esSlugBloqueado(url: string): boolean {
+  const u = url.toLowerCase();
+  return SLUGS_NO_MUSICALES.some((slug) => u.includes(slug));
+}
+
 export function pareceNoMusical(title: string): boolean {
   const t = sinAcentos(title);
   return TERMINOS_NO_MUSICALES.some((termino) => t.includes(termino));

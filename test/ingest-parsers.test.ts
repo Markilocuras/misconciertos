@@ -12,6 +12,7 @@ import {
   parseLivePassEventPage,
   isBuenosAiresRegion,
   pareceNoMusical,
+  esSlugBloqueado,
   slugify,
 } from "@/lib/ingest-parsers";
 
@@ -350,6 +351,44 @@ describe("pareceNoMusical", () => {
         "INAKI URLEZAGA - EL APLAUSO FINAL en la Sala Ginastera - Teatro Argentino LP",
       ),
     ).toBe(false);
+  });
+});
+
+describe("esSlugBloqueado", () => {
+  it("bloquea las producciones que el título no delata", () => {
+    // Estas tres son obras y ballet: por el título son idénticas a un recital,
+    // así que la única forma de sacarlas es nombrarlas.
+    expect(
+      esSlugBloqueado("https://livepass.com.ar/events/autos-robados-en-el-teatro-opera-lp"),
+    ).toBe(true);
+    expect(
+      esSlugBloqueado(
+        "https://livepass.com.ar/events/inaki-urlezaga-el-aplauso-final-en-la-sala-ginastera-teatro-argentino-lp",
+      ),
+    ).toBe(true);
+  });
+
+  it("agarra todas las funciones de la misma obra", () => {
+    // Autos Robados vuelve con una fecha distinta en el slug. Por eso el match
+    // es por fragmento y no por url exacta: si no, habría que ir agregando una
+    // entrada por función.
+    expect(
+      esSlugBloqueado("https://livepass.com.ar/events/autos-robados-en-el-teatro-opera-lp"),
+    ).toBe(true);
+    expect(
+      esSlugBloqueado("https://livepass.com.ar/events/autos-robados-en-el-teatro-opera-lp-11-09"),
+    ).toBe(true);
+  });
+
+  it("no toca los recitales", () => {
+    for (const url of [
+      "https://livepass.com.ar/events/iron-maiden-en-huracan",
+      "https://livepass.com.ar/events/babasonicos-en-el-hipodromo-de-la-plata",
+      "https://livepass.com.ar/events/a-perfect-circle",
+      "https://livepass.com.ar/events/conociendo-rusia-en-la-sala-ginastera-teatro-argentino-la-plata",
+    ]) {
+      expect(esSlugBloqueado(url), url).toBe(false);
+    }
   });
 });
 

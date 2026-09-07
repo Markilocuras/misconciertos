@@ -16,6 +16,7 @@ import {
   parseLivePassEventLinks,
   parseLivePassEventPage,
   pareceNoMusical,
+  esSlugBloqueado,
   extractAllAccessEventLinks,
   parseAllAccessEventPage,
   parseDalePlayLive,
@@ -699,7 +700,9 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
               .filter((r) => r.source === "livepass")
               .map((r) => r.external_id.split("#")[0]),
           );
-          const nuevos = links.filter((l) => !knownLivePassUrls.has(l));
+          // El bloqueo por slug va antes que todo: asi no se gasta un fetch en
+          // una pagina que de todas formas se iba a descartar.
+          const nuevos = links.filter((l) => !knownLivePassUrls.has(l) && !esSlugBloqueado(l));
           const toFetch = nuevos.slice(0, MAX_LIVEPASS_EVENT_FETCHES);
 
           const events: ScrapedEvent[] = [];
