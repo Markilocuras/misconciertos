@@ -11,6 +11,7 @@ import {
   parseLivePassEventLinks,
   parseLivePassEventPage,
   isBuenosAiresRegion,
+  pareceNoMusical,
   slugify,
 } from "@/lib/ingest-parsers";
 
@@ -297,6 +298,58 @@ describe("isBuenosAiresRegion", () => {
     );
     expect(fuera?.venue).toBe("Estadio Julio César Villagra");
     expect(isBuenosAiresRegion(fuera?.region)).toBe(false);
+  });
+});
+
+describe("pareceNoMusical", () => {
+  it("frena lo que se nombra a sí mismo como no musical", () => {
+    // Títulos reales del listado de Live Pass.
+    for (const title of [
+      "Lectura. Claire Keegan por Claire Keegan en MALBA",
+      "NANUTRIA - OPINIONES VARIAS - STAND UP COMEDY en Sala Piazzolla - Teatro Argentino LP",
+      "PLACERES CULPOSOS: #100 PROGRAMAS DE NDA en CCNU",
+    ]) {
+      expect(pareceNoMusical(title), title).toBe(true);
+    }
+  });
+
+  it("no toca los recitales, que es lo que más importa", () => {
+    // Un falso positivo cuesta un recital que no entra al mapa, y eso es peor
+    // que un intruso que sí entra. Por eso la lista de términos es corta.
+    for (const title of [
+      "IRON MAIDEN en Huracan",
+      "BABASONICOS en el Hipodromo de La Plata",
+      "La Vela Puerca + Las Pelotas en el Hipodromo de La Plata",
+      "Ludovico Einaudi: Solo Piano en el Teatro Colon",
+      "ROMPIENDO ESPEJOS - Tributo a Callejeros en el Teatro Opera LP",
+      "FIESTA PLOP: Homenaje a Moria Casan en el Teatro Opera LP",
+      "KLEZMER: POR LA VIDA Y LA PAZ ENTRE LOS PUEBLOS en el Teatro Opera LP",
+      "JOHN & PAUL THE BEATLES EXPERIENCE en CCNU",
+      "CEREMONIA ROCK NACIONAL en San Miguel",
+      "LEIPARTY en Quilmes",
+      "Sebastian Brasero Swingbook en CCNU",
+    ]) {
+      expect(pareceNoMusical(title), title).toBe(false);
+    }
+  });
+
+  it("ignora acentos y mayúsculas", () => {
+    expect(pareceNoMusical("Conferencia sobre rock")).toBe(true);
+    expect(pareceNoMusical("CONFERENCIA sobre rock")).toBe(true);
+    expect(pareceNoMusical("Ballet Estable del Teatro Colón")).toBe(true);
+  });
+
+  it("es un colador, no un filtro: lo que no se nombra se cuela", () => {
+    // Estos son los casos que el título no delata y ninguna regla automática va
+    // a agarrar. Está testeado a propósito para que quede escrito que se sabe:
+    // si algún día aparece una forma de distinguirlos, este test tiene que
+    // cambiar de expectativa.
+    expect(pareceNoMusical("AUTOS ROBADOS en el Teatro Opera LP")).toBe(false);
+    expect(
+      pareceNoMusical(
+        "INAKI URLEZAGA - EL APLAUSO FINAL en la Sala Ginastera - Teatro Argentino LP",
+      ),
+    ).toBe(false);
   });
 });
 

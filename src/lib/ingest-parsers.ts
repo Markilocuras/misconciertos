@@ -568,6 +568,44 @@ function limpiarInterrogantesRotos(title: string): string {
     .trim();
 }
 
+/**
+ * Si el título delata que el evento no es musical.
+ *
+ * Live Pass no publica la categoría en ningún lado: no está en el JSON-LD, no
+ * hay breadcrumb, y sus taxons agrupan por venue y no por género (`/taxons/
+ * teatro` resultó ser casi todo Café Berlín, que es música). Así que lo único
+ * que queda es leer el título.
+ *
+ * Esto es un colador, no un filtro: agarra lo que se nombra a sí mismo —una
+ * lectura, un stand-up, un ballet— y no puede agarrar lo que no. "AUTOS ROBADOS
+ * en el Teatro Opera LP" es una obra de teatro y por el título es idéntica a un
+ * recital. Sobre las 76 fechas porteñas que Live Pass publica hoy, esto baja los
+ * no-musicales de unos nueve a unos cuatro.
+ *
+ * Los términos son deliberadamente pocos y específicos. Un falso positivo acá
+ * cuesta un recital que no entra al mapa, que es peor que un intruso que sí
+ * entra: por eso no están "fiesta", "show" ni "espectáculo", que aparecen tanto
+ * en eventos musicales como en los otros.
+ */
+const TERMINOS_NO_MUSICALES = [
+  "stand up",
+  "stand-up",
+  "standup",
+  "lectura",
+  "ballet",
+  "conferencia",
+  "masterclass",
+  "seminario",
+  "obra de teatro",
+  "teatro leido",
+  "programas de",
+];
+
+export function pareceNoMusical(title: string): boolean {
+  const t = sinAcentos(title);
+  return TERMINOS_NO_MUSICALES.some((termino) => t.includes(termino));
+}
+
 function coordenada(input: unknown): number | null {
   const n = typeof input === "string" ? Number(input) : typeof input === "number" ? input : NaN;
   return Number.isFinite(n) ? n : null;
