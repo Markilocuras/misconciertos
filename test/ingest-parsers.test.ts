@@ -263,6 +263,20 @@ describe("parseLivePassEventPage", () => {
     expect(caba?.artist).toBe("A PERFECT CIRCLE + PUSCIFER");
   });
 
+  it("descarta la descripción de Live Pass, que son las condiciones de venta", () => {
+    // Live Pass no publica una descripción del show: publica el bloque de
+    // condiciones de venta de la ficha, aplastado sin espacios. La de Iron
+    // Maiden llegaba a 7.064 caracteres y arrancaba con "PODÉS ABONAR CON
+    // TARJETAS VISA DE CRÉDITO Y DÉBITO...", y se renderizaba entera en el
+    // medio de la ficha del concierto.
+    //
+    // Se cae al mismo texto que el resto de las fuentes, que la ficha ya sabe
+    // que es una plantilla y no muestra (ver realDescription en concert-copy).
+    expect(caba?.description).toBe("Concierto en Microestadio Malvinas Argentinas.");
+    expect(provincia?.description).toBe("Concierto en XLR Club.");
+    expect(caba?.description).not.toMatch(/ABONAR|TARJETA|CARGO POR SERVICIO/i);
+  });
+
   it("prefiere la url del JSON-LD antes que la de la página", () => {
     expect(caba?.buy_url).toBe("https://livepass.com.ar/events/a-perfect-circle");
   });
