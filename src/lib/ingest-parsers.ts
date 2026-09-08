@@ -667,12 +667,16 @@ export function parseLivePassEventPage(html: string, pageUrl: string): ScrapedEv
     date,
     time,
     price: prices.length ? formatArsPrice(Math.min(...prices)) : null,
-    description:
-      ev.description && ev.description !== ev.name
-        ? decodeHtmlEntities(ev.description)
-        : venue
-          ? `Concierto en ${venue}.`
-          : null,
+    // La descripción de Live Pass se ignora a propósito, a diferencia de la de
+    // All Access. No es una descripción: es el bloque de condiciones de venta
+    // de la ficha, aplastado sin espacios. Las 28 que habían entrado tenían una
+    // mediana de 443 caracteres y la de Iron Maiden llegaba a 7.064, arrancando
+    // con "PODÉS ABONAR CON TARJETAS VISA DE CRÉDITO Y DÉBITO...".
+    //
+    // Y las cortas tampoco sirven: son "ENTRADAPRECIOGENERALDesde $35.000..."
+    // o el título con la dirección y la fecha, que ya tenemos en sus campos.
+    // Ninguna de las 28 aportaba una sola línea sobre el show.
+    description: venue ? `Concierto en ${venue}.` : null,
     image_url: safeHttpUrl(jsonImage ?? null) ?? extractOgImage(html),
     buy_url: safeHttpUrl(ev.url) ?? pageUrl,
     locality: ev.location?.address?.addressLocality ?? null,
