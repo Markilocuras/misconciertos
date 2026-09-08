@@ -129,6 +129,7 @@ export type Database = {
           buy_url: string | null
           created_at: string
           date: string | null
+          digest_sent_at: string | null
           description: string | null
           external_id: string
           id: string
@@ -150,6 +151,7 @@ export type Database = {
           buy_url?: string | null
           created_at?: string
           date?: string | null
+          digest_sent_at?: string | null
           description?: string | null
           external_id: string
           id?: string
@@ -171,6 +173,7 @@ export type Database = {
           buy_url?: string | null
           created_at?: string
           date?: string | null
+          digest_sent_at?: string | null
           description?: string | null
           external_id?: string
           id?: string
