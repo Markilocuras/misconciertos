@@ -114,11 +114,13 @@ REVOKE ALL ON FUNCTION public.trigger_concert_digest() FROM PUBLIC, anon, authen
 -- 3. Los jobs
 -- ---------------------------------------------------------------------------
 
+-- La variable NO se puede llamar `job`: adentro del EXISTS chocaría con la
+-- columna de cron.job y Postgres corta con "column reference is ambiguous".
 DO $$
 DECLARE
-  job text;
+  nombre_job text;
 BEGIN
-  FOREACH job IN ARRAY ARRAY[
+  FOREACH nombre_job IN ARRAY ARRAY[
     'ingest-concerts-twice-daily',
     'ingest-allaccess',
     'ingest-daleplay',
@@ -127,8 +129,8 @@ BEGIN
     'ingest-allevents',
     'concert-digest'
   ] LOOP
-    IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = job) THEN
-      PERFORM cron.unschedule(job);
+    IF EXISTS (SELECT 1 FROM cron.job j WHERE j.jobname = nombre_job) THEN
+      PERFORM cron.unschedule(nombre_job);
     END IF;
   END LOOP;
 END $$;
