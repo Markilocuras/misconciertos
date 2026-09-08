@@ -65,9 +65,7 @@ export function SaveButton({ concertId }: { concertId: string }) {
 
   return (
     <Button size="sm" variant="outline" onClick={toggle} disabled={busy}>
-      <Heart
-        className={`mr-1.5 h-3.5 w-3.5 ${saved ? "fill-primary text-primary" : ""}`}
-      />
+      <Heart className={`mr-1.5 h-3.5 w-3.5 ${saved ? "fill-primary text-primary" : ""}`} />
       {saved ? "Guardado" : "Guardar"}
     </Button>
   );
