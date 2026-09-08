@@ -10,6 +10,7 @@ import {
   type DigestRecipient,
   type FuenteCaida,
 } from "@/lib/email.server";
+import { selectSources, TOPES_JUNTAS, TOPES_SOLO, type IngestSource } from "@/lib/ingest-sources";
 import {
   parseAllEventsListing,
   isBuenosAiresRegion,
@@ -42,23 +43,14 @@ const ALLACCESS_HOME = "https://www.allaccess.com.ar/";
 const DALEPLAY_LIVE = "https://daleplay.la/live-shows/live/";
 const LIVEPASS_LISTING = "https://livepass.com.ar/taxons/show";
 
-// Cloudflare Workers limita los subrequests por invocación; no fetcheamos
-// más que esto de páginas de evento nuevas de All Access por corrida.
-const MAX_ALLACCESS_EVENT_FETCHES = 20;
-// Ídem para Ticketek: páginas de artista (nivel intermedio) y de show.
-const MAX_TICKETEK_ARTIST_FETCHES = 8;
-const MAX_TICKETEK_SHOW_FETCHES = 12;
-// Ídem para Live Pass, cuyo listado no dice ni el lugar ni el título completo:
-// hay que abrir la página de cada evento para sacar el JSON-LD. El tope es
-// conservador a propósito porque es la quinta fuente y el presupuesto de
-// subrequests ya venía sin margen. Con esto, las ~76 fechas que Live Pass
-// publica hoy tardan unas diez corridas en entrar todas; después, cada corrida
-// solo mira lo que no conoce y sale casi gratis.
-const MAX_LIVEPASS_EVENT_FETCHES = 8;
-// Backfill de ids de Spotify (?spotify=1). Cloudflare corta la invocación a los
-// 50 subrequests, y una corrida normal ya llega justo, así que el backfill va en
-// su propia invocación y con tope propio: por cada artista distinto sale una
-// búsqueda mas un update, o sea dos subrequests.
+// Los topes de fetches por fuente viven en @/lib/ingest-sources, junto al
+// modelo de costo y al test que verifica que el peor caso entra en los 50
+// subrequests de Cloudflare. Cuál de los dos juegos se usa lo decide `?source=`:
+// una fuente sola tiene los 50 para ella, las cinco juntas se los reparten.
+//
+// Backfill de ids de Spotify (?spotify=1). Va en su propia invocación desde que
+// resolverlos dentro del scrapeo reventaba el techo: por cada artista distinto
+// sale una búsqueda mas un update, o sea dos subrequests.
 const MAX_SPOTIFY_BACKFILL_ARTISTS = 18;
 
 const BROWSER_HEADERS = {
@@ -290,6 +282,99 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
           );
         }
 
+        // El mail de conciertos nuevos sale en su propia invocación (?digest=1)
+        // desde que la ingesta corre una fuente por vez: viviendo adentro del
+        // scrapeo saldría un mail por fuente, cinco por corrida.
+        //
+        // Qué cuenta como "nuevo" ya no se deduce de la corrida sino de una
+        // marca en la fila: digest_sent_at en null es un show que todavía no se
+        // avisó. Aguanta mejor que la lógica vieja: si el envío falla, los
+        // conciertos quedan sin marcar y entran en el próximo mail en vez de
+        // perderse, y el cron del digest no tiene que caer justo después del
+        // scrapeo para ver lo que se acaba de escribir.
+        if (url.searchParams.get("digest") === "1") {
+          const { data: sinAvisar, error: sinAvisarErr } = await supabaseAdmin
+            .from("concerts")
+            .select("id, title, artist, venue, date, time, slug")
+            .is("digest_sent_at", null)
+            .gte("date", today)
+            .order("date", { ascending: true });
+          if (sinAvisarErr) {
+            return new Response(JSON.stringify({ error: sinAvisarErr.message }), {
+              status: 500,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+
+          const nuevos = sinAvisar ?? [];
+          const responder = (digest: Record<string, unknown>) =>
+            new Response(JSON.stringify({ ok: true, digest }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
+
+          if (nuevos.length === 0) return responder({ new: 0, sent: 0, failed: 0 });
+
+          const apiKey = process.env.RESEND_API_KEY;
+          if (!apiKey) {
+            return responder({
+              new: nuevos.length,
+              sent: 0,
+              failed: 0,
+              error: "RESEND_API_KEY not set",
+            });
+          }
+
+          const { data: destinatarios, error: destErr } = await supabaseAdmin.rpc(
+            "list_concert_digest_recipients",
+          );
+          if (destErr) {
+            console.error("[ingest-concerts] recipients failed", destErr);
+            return responder({ new: nuevos.length, sent: 0, failed: 0, error: destErr.message });
+          }
+
+          const result = await sendNewConcertsDigest(
+            apiKey,
+            nuevos as DigestConcert[],
+            (destinatarios ?? []) as DigestRecipient[],
+          );
+
+          // Se marcan solo si no falló ningún envío. Si Resend rechazó un lote,
+          // esos conciertos quedan sin marcar y salen en el próximo digest;
+          // preferimos un mail repetido antes que un show que no se avisó
+          // nunca. Sin destinatarios también se marcan: no hay a quién avisarle,
+          // y si no, el primero que se suscriba recibiría el acumulado entero.
+          let marcados = 0;
+          if (result.failed === 0) {
+            const { error: marcaErr } = await supabaseAdmin
+              .from("concerts")
+              .update({ digest_sent_at: new Date().toISOString() })
+              .in(
+                "id",
+                nuevos.map((c) => c.id),
+              );
+            if (marcaErr) console.error("[ingest-concerts] marcar digest fallo", marcaErr);
+            else marcados = nuevos.length;
+          }
+
+          return responder({ new: nuevos.length, ...result, marcados });
+        }
+
+        // Qué fuentes corre esta invocación. El cron manda una por vez
+        // (`?source=allaccess`, etc.): así cada una tiene los 50 subrequests de
+        // Cloudflare para ella sola y los topes de fetches pueden ser
+        // razonables. Sin el parámetro corren las cinco, que es el modo para
+        // correr a mano y para `?debug=1`, y ahí los topes bajan.
+        const seleccion = selectSources(url.searchParams.get("source"));
+        if (!seleccion.ok) {
+          return new Response(JSON.stringify({ error: seleccion.error }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+        const topes = seleccion.solo ? TOPES_SOLO : TOPES_JUNTAS;
+        const correr = (s: IngestSource) => seleccion.sources.includes(s);
+
         // Filas futuras ya conocidas: evita re-fetchear páginas de evento de
         // All Access y duplicar shows que Dale Play linkea a otra ticketera.
         const { data: existingRows } = await supabaseAdmin
@@ -343,13 +428,6 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
             .map((r) => [`${r.source}\0${r.external_id}`, r.slug as string]),
         );
         const usedSlugs = new Set(existingSlugByKey.values());
-
-        // Lo que no esté en existingKeys es un show que entra por primera vez:
-        // eso, y solo eso, es lo que se avisa por mail al final de la corrida.
-        const existingKeys = new Set(
-          (existingRows ?? []).map((r) => `${r.source} ${r.external_id}`),
-        );
-        const newConcerts: DigestConcert[] = [];
 
         function assignSlugs(rows: ConcertRowInsert[]) {
           for (const row of rows) {
@@ -418,20 +496,6 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
               .from("concerts")
               .upsert(kept, { onConflict: "source,external_id" });
             if (error) throw error;
-
-            for (const row of kept) {
-              const key = `${row.source} ${row.external_id}`;
-              if (existingKeys.has(key)) continue;
-              existingKeys.add(key);
-              newConcerts.push({
-                title: row.title,
-                artist: row.artist,
-                venue: row.venue,
-                date: row.date,
-                time: row.time,
-                slug: row.slug ?? null,
-              });
-            }
           }
           results[sourceKey] = {
             ...(found !== undefined ? { found } : {}),
@@ -444,347 +508,333 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
           };
         }
 
-        // --- allevents.in (fetch directo, cards del listado) -----------------
-        try {
-          // Los dos listados se solapan casi por completo, pero cada uno trae
-          // algun evento que el otro no: se juntan y se deduplica por link.
-          const seen = new Set<string>();
-          const events: ScrapedEvent[] = [];
-          for (const { url: sourceUrl } of ALLEVENTS_SOURCES) {
-            const html = await fetchHtml(sourceUrl);
-            for (const ev of parseAllEventsListing(html)) {
-              if (!ev.buy_url || seen.has(ev.buy_url)) continue;
-              seen.add(ev.buy_url);
-              events.push(ev);
-            }
-          }
-
-          const fresh = events.filter((ev) => {
-            if (!ev.date) return true;
-            if (ev.artist && knownArtistDates.has(artistDateKey(ev.artist, ev.date))) return false;
-            const key = venueDateKey(ev.venue, ev.date);
-            return !(key && knownVenueDates.has(key));
-          });
-          const skipped = events.length - fresh.length;
-
-          if (debug) {
-            results["allevents"] = {
-              found: events.length,
-              scraped: fresh.length,
-              upserted: 0,
-              discarded: 0,
-              skipped,
-              parsedSample: fresh.slice(0, 5),
-            };
-          } else {
-            const rows = fresh.map((ev) =>
-              toRow("allevents", ev.buy_url ?? `${ev.title}:${ev.date}`, ev),
-            );
-            await upsert("allevents", rows, fresh.length, skipped, events.length);
-          }
-        } catch (err) {
-          console.error("[ingest-concerts] allevents failed", err);
-          results["allevents"] = {
-            scraped: 0,
-            upserted: 0,
-            discarded: 0,
-            error: err instanceof Error ? err.message : String(err),
-          };
-        }
-
         // --- allaccess.com.ar (fetch directo + JSON-LD por evento) -----------
-        try {
-          const home = await fetchHtml(ALLACCESS_HOME);
-          const links = extractAllAccessEventLinks(home);
-          const newLinks = links.filter((l) => !knownAllAccessUrls.has(l));
-          const toFetch = newLinks.slice(0, MAX_ALLACCESS_EVENT_FETCHES);
-          const skipped = links.length - toFetch.length;
+        if (correr("allaccess")) {
+          try {
+            const home = await fetchHtml(ALLACCESS_HOME);
+            const links = extractAllAccessEventLinks(home);
+            const newLinks = links.filter((l) => !knownAllAccessUrls.has(l));
+            const toFetch = newLinks.slice(0, topes.allaccessEventos);
+            const skipped = links.length - toFetch.length;
 
-          const events: ScrapedEvent[] = [];
-          for (const link of toFetch) {
-            try {
-              const page = await fetchHtml(link);
-              const ev = parseAllAccessEventPage(page, link);
-              if (ev) events.push(ev);
-            } catch (err) {
-              console.error(`[ingest-concerts] allaccess event ${link} failed`, err);
+            const events: ScrapedEvent[] = [];
+            for (const link of toFetch) {
+              try {
+                const page = await fetchHtml(link);
+                const ev = parseAllAccessEventPage(page, link);
+                if (ev) events.push(ev);
+              } catch (err) {
+                console.error(`[ingest-concerts] allaccess event ${link} failed`, err);
+              }
             }
-          }
 
-          if (debug) {
+            if (debug) {
+              results["allaccess"] = {
+                found: links.length,
+                scraped: events.length,
+                upserted: 0,
+                discarded: 0,
+                skipped,
+                parsedSample: events.slice(0, 5),
+              };
+            } else {
+              // El mismo show puede tener varias fechas en la misma página, y el
+              // external_id lleva la fecha para no pisarlas entre sí.
+              const rows = events.map((ev) => toRow("allaccess", `${ev.buy_url}#${ev.date}`, ev));
+              for (const ev of events) {
+                if (ev.buy_url) buyUrlsElsewhere.add(ev.buy_url);
+              }
+              await upsert("allaccess", rows, events.length, skipped, links.length);
+            }
+          } catch (err) {
+            console.error("[ingest-concerts] allaccess failed", err);
             results["allaccess"] = {
-              found: links.length,
-              scraped: events.length,
+              scraped: 0,
               upserted: 0,
               discarded: 0,
-              skipped,
-              parsedSample: events.slice(0, 5),
+              error: err instanceof Error ? err.message : String(err),
             };
-          } else {
-            // El mismo show puede tener varias fechas en la misma página, y el
-            // external_id lleva la fecha para no pisarlas entre sí.
-            const rows = events.map((ev) => toRow("allaccess", `${ev.buy_url}#${ev.date}`, ev));
-            for (const ev of events) {
-              if (ev.buy_url) buyUrlsElsewhere.add(ev.buy_url);
-            }
-            await upsert("allaccess", rows, events.length, skipped, links.length);
           }
-        } catch (err) {
-          console.error("[ingest-concerts] allaccess failed", err);
-          results["allaccess"] = {
-            scraped: 0,
-            upserted: 0,
-            discarded: 0,
-            error: err instanceof Error ? err.message : String(err),
-          };
         }
 
         // --- daleplay.la (fetch directo, cards HTML) --------------------------
-        try {
-          const page = await fetchHtml(DALEPLAY_LIVE);
-          const all = parseDalePlayLive(page);
-          // Si el show ya entró por otra ticketera (p.ej. Dale Play linkea a
-          // All Access), no lo duplicamos.
-          const events = all.filter((ev) => !ev.buy_url || !buyUrlsElsewhere.has(ev.buy_url));
+        if (correr("daleplay")) {
+          try {
+            const page = await fetchHtml(DALEPLAY_LIVE);
+            const all = parseDalePlayLive(page);
+            // Si el show ya entró por otra ticketera (p.ej. Dale Play linkea a
+            // All Access), no lo duplicamos.
+            const events = all.filter((ev) => !ev.buy_url || !buyUrlsElsewhere.has(ev.buy_url));
 
-          if (debug) {
+            if (debug) {
+              results["daleplay"] = {
+                found: all.length,
+                scraped: all.length,
+                upserted: 0,
+                discarded: 0,
+                skipped: all.length - events.length,
+                parsedSample: events.slice(0, 5),
+              };
+            } else {
+              const rows = events.map((ev) => toRow("daleplay", `${ev.buy_url}#${ev.date}`, ev));
+              await upsert("daleplay", rows, events.length, all.length - events.length, all.length);
+            }
+          } catch (err) {
+            console.error("[ingest-concerts] daleplay failed", err);
             results["daleplay"] = {
-              found: all.length,
-              scraped: all.length,
+              scraped: 0,
               upserted: 0,
               discarded: 0,
-              skipped: all.length - events.length,
-              parsedSample: events.slice(0, 5),
+              error: err instanceof Error ? err.message : String(err),
             };
-          } else {
-            const rows = events.map((ev) => toRow("daleplay", `${ev.buy_url}#${ev.date}`, ev));
-            await upsert("daleplay", rows, events.length, all.length - events.length, all.length);
           }
-        } catch (err) {
-          console.error("[ingest-concerts] daleplay failed", err);
-          results["daleplay"] = {
-            scraped: 0,
-            upserted: 0,
-            discarded: 0,
-            error: err instanceof Error ? err.message : String(err),
-          };
         }
 
         // --- ticketek.com.ar (API CMS JSON, solo Buenos Aires) ----------------
-        try {
-          const listJson = await fetchJson(ticketekApiUrl("musica"));
-          // El total de la lista, antes de quedarnos con Buenos Aires: es lo que
-          // dice si la API sigue respondiendo lo que esperamos.
-          const listItems = parseTicketekMusicList(listJson);
-          const baItems = listItems.filter((i) =>
-            ["Capital Federal", "Buenos Aires"].includes(i.state ?? ""),
-          );
+        if (correr("ticketek")) {
+          try {
+            const listJson = await fetchJson(ticketekApiUrl("musica"));
+            // El total de la lista, antes de quedarnos con Buenos Aires: es lo que
+            // dice si la API sigue respondiendo lo que esperamos.
+            const listItems = parseTicketekMusicList(listJson);
+            const baItems = listItems.filter((i) =>
+              ["Capital Federal", "Buenos Aires"].includes(i.state ?? ""),
+            );
 
-          // Candidatos: shows directos (artista/venue) + los shows de BA de las
-          // páginas de artista (un fetch extra cada una, acotado).
-          type Candidate = {
-            link: string;
-            name: string;
-            venue: string | null;
-            image: string | null;
-          };
-          const candidates = new Map<string, Candidate>();
-          for (const item of baItems.filter((i) => i.url.includes("/"))) {
-            candidates.set(item.url, {
-              link: item.url,
-              name: item.name,
-              venue: item.venue,
-              image: item.image,
-            });
-          }
-          const artistPages = baItems
-            .filter((i) => !i.url.includes("/"))
-            .slice(0, MAX_TICKETEK_ARTIST_FETCHES);
-          for (const item of artistPages) {
-            try {
-              const artistJson = await fetchJson(ticketekApiUrl(item.url));
-              for (const show of parseTicketekArtistShows(artistJson)) {
-                const locality = show.locality ?? "";
-                if (!/^(Capital Federal|Buenos Aires)/.test(locality)) continue;
-                if (!candidates.has(show.link)) {
-                  candidates.set(show.link, {
-                    link: show.link,
-                    name: item.name,
-                    venue: show.venue ?? item.venue,
-                    image: show.image ?? item.image,
+            // Candidatos: shows directos (artista/venue) + los shows de BA de las
+            // páginas de artista (un fetch extra cada una, acotado).
+            type Candidate = {
+              link: string;
+              name: string;
+              venue: string | null;
+              image: string | null;
+            };
+            const candidates = new Map<string, Candidate>();
+            for (const item of baItems.filter((i) => i.url.includes("/"))) {
+              candidates.set(item.url, {
+                link: item.url,
+                name: item.name,
+                venue: item.venue,
+                image: item.image,
+              });
+            }
+            const artistPages = baItems
+              .filter((i) => !i.url.includes("/"))
+              .slice(0, topes.ticketekArtistas);
+            for (const item of artistPages) {
+              try {
+                const artistJson = await fetchJson(ticketekApiUrl(item.url));
+                for (const show of parseTicketekArtistShows(artistJson)) {
+                  const locality = show.locality ?? "";
+                  if (!/^(Capital Federal|Buenos Aires)/.test(locality)) continue;
+                  if (!candidates.has(show.link)) {
+                    candidates.set(show.link, {
+                      link: show.link,
+                      name: item.name,
+                      venue: show.venue ?? item.venue,
+                      image: show.image ?? item.image,
+                    });
+                  }
+                }
+              } catch (err) {
+                console.error(`[ingest-concerts] ticketek artist ${item.url} failed`, err);
+              }
+            }
+
+            const knownTicketekUrls = new Set(
+              (existingRows ?? [])
+                .filter((r) => r.source === "ticketek")
+                .map((r) => r.external_id.split("#")[0]),
+            );
+            const toFetch = [...candidates.values()]
+              .filter((c) => !knownTicketekUrls.has(`${TICKETEK_SITE}/${c.link}`))
+              .slice(0, topes.ticketekShows);
+            const skipped = candidates.size - toFetch.length;
+
+            const events: ScrapedEvent[] = [];
+            for (const candidate of toFetch) {
+              try {
+                const showJson = await fetchJson(ticketekApiUrl(candidate.link));
+                const buyUrl = `${TICKETEK_SITE}/${candidate.link}`;
+                for (const perf of parseTicketekShow(showJson)) {
+                  events.push({
+                    title: candidate.name,
+                    artist: candidate.name,
+                    venue: candidate.venue,
+                    date: perf.date,
+                    time: perf.time,
+                    price: perf.price,
+                    // Ticketek no trae descripción y fabricarla acá como
+                    // "Concierto en {venue}." dejaba 31 fichas del Movistar Arena
+                    // diciendo exactamente lo mismo. El texto de la ficha se
+                    // compone al renderizar, con los datos de la fila: ver
+                    // src/lib/concert-copy.ts.
+                    description: null,
+                    image_url: candidate.image,
+                    buy_url: buyUrl,
+                    locality: null,
                   });
                 }
+              } catch (err) {
+                console.error(`[ingest-concerts] ticketek show ${candidate.link} failed`, err);
               }
-            } catch (err) {
-              console.error(`[ingest-concerts] ticketek artist ${item.url} failed`, err);
             }
-          }
 
-          const knownTicketekUrls = new Set(
-            (existingRows ?? [])
-              .filter((r) => r.source === "ticketek")
-              .map((r) => r.external_id.split("#")[0]),
-          );
-          const toFetch = [...candidates.values()]
-            .filter((c) => !knownTicketekUrls.has(`${TICKETEK_SITE}/${c.link}`))
-            .slice(0, MAX_TICKETEK_SHOW_FETCHES);
-          const skipped = candidates.size - toFetch.length;
-
-          const events: ScrapedEvent[] = [];
-          for (const candidate of toFetch) {
-            try {
-              const showJson = await fetchJson(ticketekApiUrl(candidate.link));
-              const buyUrl = `${TICKETEK_SITE}/${candidate.link}`;
-              for (const perf of parseTicketekShow(showJson)) {
-                events.push({
-                  title: candidate.name,
-                  artist: candidate.name,
-                  venue: candidate.venue,
-                  date: perf.date,
-                  time: perf.time,
-                  price: perf.price,
-                  // Ticketek no trae descripción y fabricarla acá como
-                  // "Concierto en {venue}." dejaba 31 fichas del Movistar Arena
-                  // diciendo exactamente lo mismo. El texto de la ficha se
-                  // compone al renderizar, con los datos de la fila: ver
-                  // src/lib/concert-copy.ts.
-                  description: null,
-                  image_url: candidate.image,
-                  buy_url: buyUrl,
-                  locality: null,
-                });
-              }
-            } catch (err) {
-              console.error(`[ingest-concerts] ticketek show ${candidate.link} failed`, err);
+            const kept = events.filter((ev) => !ev.buy_url || !buyUrlsElsewhere.has(ev.buy_url));
+            if (debug) {
+              results["ticketek"] = {
+                found: listItems.length,
+                scraped: events.length,
+                upserted: 0,
+                discarded: 0,
+                skipped,
+                parsedSample: kept.slice(0, 5),
+              };
+            } else {
+              const rows = kept.map((ev) => toRow("ticketek", `${ev.buy_url}#${ev.date}`, ev));
+              await upsert(
+                "ticketek",
+                rows,
+                events.length,
+                skipped + (events.length - kept.length),
+                listItems.length,
+              );
             }
-          }
-
-          const kept = events.filter((ev) => !ev.buy_url || !buyUrlsElsewhere.has(ev.buy_url));
-          if (debug) {
+          } catch (err) {
+            console.error("[ingest-concerts] ticketek failed", err);
             results["ticketek"] = {
-              found: listItems.length,
-              scraped: events.length,
+              scraped: 0,
               upserted: 0,
               discarded: 0,
-              skipped,
-              parsedSample: kept.slice(0, 5),
+              error: err instanceof Error ? err.message : String(err),
             };
-          } else {
-            const rows = kept.map((ev) => toRow("ticketek", `${ev.buy_url}#${ev.date}`, ev));
-            await upsert(
-              "ticketek",
-              rows,
-              events.length,
-              skipped + (events.length - kept.length),
-              listItems.length,
-            );
           }
-        } catch (err) {
-          console.error("[ingest-concerts] ticketek failed", err);
-          results["ticketek"] = {
-            scraped: 0,
-            upserted: 0,
-            discarded: 0,
-            error: err instanceof Error ? err.message : String(err),
-          };
         }
 
         // --- livepass.com.ar (listado + JSON-LD por evento) -------------------
-        try {
-          // El listado solo sirve links: el título viene truncado con puntos
-          // suspensivos y no dice ni el lugar ni la provincia. Todo eso está en
-          // el JSON-LD de la página de cada evento, así que hay que abrirlas.
-          const links = parseLivePassEventLinks(await fetchHtml(LIVEPASS_LISTING));
-          const knownLivePassUrls = new Set(
-            (existingRows ?? [])
-              .filter((r) => r.source === "livepass")
-              .map((r) => r.external_id.split("#")[0]),
-          );
-          // El bloqueo por slug va antes que todo: asi no se gasta un fetch en
-          // una pagina que de todas formas se iba a descartar.
-          const nuevos = links.filter((l) => !knownLivePassUrls.has(l) && !esSlugBloqueado(l));
-          const toFetch = nuevos.slice(0, MAX_LIVEPASS_EVENT_FETCHES);
+        if (correr("livepass")) {
+          try {
+            // El listado solo sirve links: el título viene truncado con puntos
+            // suspensivos y no dice ni el lugar ni la provincia. Todo eso está en
+            // el JSON-LD de la página de cada evento, así que hay que abrirlas.
+            const links = parseLivePassEventLinks(await fetchHtml(LIVEPASS_LISTING));
+            const knownLivePassUrls = new Set(
+              (existingRows ?? [])
+                .filter((r) => r.source === "livepass")
+                .map((r) => r.external_id.split("#")[0]),
+            );
+            // El bloqueo por slug va antes que todo: asi no se gasta un fetch en
+            // una pagina que de todas formas se iba a descartar.
+            const nuevos = links.filter((l) => !knownLivePassUrls.has(l) && !esSlugBloqueado(l));
+            const toFetch = nuevos.slice(0, topes.livepassEventos);
 
-          const events: ScrapedEvent[] = [];
-          let fueraDeZona = 0;
-          let noMusicales = 0;
-          for (const link of toFetch) {
-            try {
-              const ev = parseLivePassEventPage(await fetchHtml(link), link);
-              if (!ev) continue;
-              // Live Pass vende en todo el país y esto es un mapa de Buenos
-              // Aires: sin el filtro entran Córdoba, Neuquén y compañía.
-              if (!isBuenosAiresRegion(ev.region)) {
-                fueraDeZona += 1;
-                continue;
+            const events: ScrapedEvent[] = [];
+            let fueraDeZona = 0;
+            let noMusicales = 0;
+            for (const link of toFetch) {
+              try {
+                const ev = parseLivePassEventPage(await fetchHtml(link), link);
+                if (!ev) continue;
+                // Live Pass vende en todo el país y esto es un mapa de Buenos
+                // Aires: sin el filtro entran Córdoba, Neuquén y compañía.
+                if (!isBuenosAiresRegion(ev.region)) {
+                  fueraDeZona += 1;
+                  continue;
+                }
+                // Y vende de todo, no solo música: su listado mezcla recitales con
+                // teatro, ballet y stand-up. Ver pareceNoMusical, que es un colador
+                // y no un filtro: algo se va a colar igual.
+                if (pareceNoMusical(ev.title)) {
+                  noMusicales += 1;
+                  continue;
+                }
+                events.push(ev);
+              } catch (err) {
+                console.error(`[ingest-concerts] livepass event ${link} failed`, err);
               }
-              // Y vende de todo, no solo música: su listado mezcla recitales con
-              // teatro, ballet y stand-up. Ver pareceNoMusical, que es un colador
-              // y no un filtro: algo se va a colar igual.
-              if (pareceNoMusical(ev.title)) {
-                noMusicales += 1;
-                continue;
-              }
-              events.push(ev);
-            } catch (err) {
-              console.error(`[ingest-concerts] livepass event ${link} failed`, err);
             }
-          }
 
-          // Lo salteado son los links que no se miraron en esta corrida: los que
-          // ya estaban más los que quedaron fuera del tope, más los que se
-          // abrieron y resultaron ser de otra provincia.
-          const skipped = links.length - toFetch.length + fueraDeZona + noMusicales;
+            // Lo salteado son los links que no se miraron en esta corrida: los que
+            // ya estaban más los que quedaron fuera del tope, más los que se
+            // abrieron y resultaron ser de otra provincia.
+            const skipped = links.length - toFetch.length + fueraDeZona + noMusicales;
 
-          if (debug) {
+            if (debug) {
+              results["livepass"] = {
+                found: links.length,
+                scraped: events.length,
+                upserted: 0,
+                discarded: 0,
+                skipped,
+                parsedSample: events.slice(0, 5),
+              };
+            } else {
+              const rows = events.map((ev) => toRow("livepass", `${ev.buy_url}#${ev.date}`, ev));
+              await upsert("livepass", rows, events.length, skipped, links.length);
+            }
+          } catch (err) {
+            console.error("[ingest-concerts] livepass failed", err);
             results["livepass"] = {
-              found: links.length,
-              scraped: events.length,
+              scraped: 0,
               upserted: 0,
               discarded: 0,
-              skipped,
-              parsedSample: events.slice(0, 5),
+              error: err instanceof Error ? err.message : String(err),
             };
-          } else {
-            const rows = events.map((ev) => toRow("livepass", `${ev.buy_url}#${ev.date}`, ev));
-            await upsert("livepass", rows, events.length, skipped, links.length);
           }
-        } catch (err) {
-          console.error("[ingest-concerts] livepass failed", err);
-          results["livepass"] = {
-            scraped: 0,
-            upserted: 0,
-            discarded: 0,
-            error: err instanceof Error ? err.message : String(err),
-          };
         }
 
-        // Aviso por mail, al final y después de escribir: un problema mandando
-        // mails no puede voltear una corrida que ya guardó los conciertos.
-        let digest: { new: number; sent: number; failed: number; error?: string } | undefined;
-        if (!debug && newConcerts.length > 0) {
-          const apiKey = process.env.RESEND_API_KEY;
-          if (!apiKey) {
-            digest = {
-              new: newConcerts.length,
-              sent: 0,
-              failed: 0,
-              error: "RESEND_API_KEY not set",
-            };
-          } else {
-            newConcerts.sort((a, b) => (a.date ?? "").localeCompare(b.date ?? ""));
-            const { data, error } = await supabaseAdmin.rpc("list_concert_digest_recipients");
-            if (error) {
-              console.error("[ingest-concerts] recipients failed", error);
-              digest = { new: newConcerts.length, sent: 0, failed: 0, error: error.message };
-            } else {
-              const result = await sendNewConcertsDigest(
-                apiKey,
-                newConcerts,
-                (data ?? []) as DigestRecipient[],
-              );
-              digest = { new: newConcerts.length, ...result };
+        // --- allevents.in (fetch directo, cards del listado) -----------------
+        //
+        // Va última: es la fuente menos autoritativa y la única que se cruza
+        // contra lo que ya hay en la base para no duplicar, así que le conviene
+        // mirar después de que las ticketeras escribieron lo suyo.
+        if (correr("allevents")) {
+          try {
+            // Los dos listados se solapan casi por completo, pero cada uno trae
+            // algun evento que el otro no: se juntan y se deduplica por link.
+            const seen = new Set<string>();
+            const events: ScrapedEvent[] = [];
+            for (const { url: sourceUrl } of ALLEVENTS_SOURCES) {
+              const html = await fetchHtml(sourceUrl);
+              for (const ev of parseAllEventsListing(html)) {
+                if (!ev.buy_url || seen.has(ev.buy_url)) continue;
+                seen.add(ev.buy_url);
+                events.push(ev);
+              }
             }
+
+            const fresh = events.filter((ev) => {
+              if (!ev.date) return true;
+              if (ev.artist && knownArtistDates.has(artistDateKey(ev.artist, ev.date)))
+                return false;
+              const key = venueDateKey(ev.venue, ev.date);
+              return !(key && knownVenueDates.has(key));
+            });
+            const skipped = events.length - fresh.length;
+
+            if (debug) {
+              results["allevents"] = {
+                found: events.length,
+                scraped: fresh.length,
+                upserted: 0,
+                discarded: 0,
+                skipped,
+                parsedSample: fresh.slice(0, 5),
+              };
+            } else {
+              const rows = fresh.map((ev) =>
+                toRow("allevents", ev.buy_url ?? `${ev.title}:${ev.date}`, ev),
+              );
+              await upsert("allevents", rows, fresh.length, skipped, events.length);
+            }
+          } catch (err) {
+            console.error("[ingest-concerts] allevents failed", err);
+            results["allevents"] = {
+              scraped: 0,
+              upserted: 0,
+              discarded: 0,
+              error: err instanceof Error ? err.message : String(err),
+            };
           }
         }
 
@@ -826,8 +876,8 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
         return new Response(
           JSON.stringify({
             ok: true,
+            fuentes: seleccion.sources,
             results,
-            ...(digest ? { digest } : {}),
             ...(alerta ? { alerta } : {}),
           }),
           {
