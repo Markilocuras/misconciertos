@@ -45,7 +45,11 @@ function googleCalendarUrl(c: Concert): string {
 }
 
 function icsEscape(input: string): string {
-  return input.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\n/g, "\\n");
+  return input
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\n/g, "\\n");
 }
 
 function buildIcs(c: Concert): string {
@@ -85,11 +89,7 @@ export function AddToCalendar({ concert }: { concert: Concert }) {
   return (
     <div className="flex flex-wrap gap-2">
       <Button asChild size="sm" variant="outline">
-        <a
-          href={googleCalendarUrl(concert)}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <a href={googleCalendarUrl(concert)} target="_blank" rel="noopener noreferrer">
           <CalendarPlus className="mr-1.5 h-3.5 w-3.5" />
           Google Calendar
         </a>

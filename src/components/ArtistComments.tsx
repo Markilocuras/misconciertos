@@ -94,7 +94,9 @@ export function ArtistComments({ artist }: { artist: string }) {
         <ul className="space-y-3">
           {comments.map((c) => (
             <li key={c.id} className="rounded-lg bg-accent/30 p-3 text-sm">
-              <p className="text-xs font-medium text-primary">{c.profiles?.username ?? "Usuario"}</p>
+              <p className="text-xs font-medium text-primary">
+                {c.profiles?.username ?? "Usuario"}
+              </p>
               <p className="mt-1 text-foreground/90">{c.body}</p>
             </li>
           ))}
