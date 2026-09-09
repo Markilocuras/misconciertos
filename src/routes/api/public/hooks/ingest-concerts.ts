@@ -14,6 +14,7 @@ import { selectSources, TOPES_JUNTAS, TOPES_SOLO, type IngestSource } from "@/li
 import {
   parseAllEventsListing,
   isBuenosAiresRegion,
+  esDeOtraProvincia,
   parseLivePassEventLinks,
   parseLivePassEventPage,
   pareceNoMusical,
@@ -148,6 +149,11 @@ type SourceReport = {
   upserted: number;
   discarded: number;
   skipped?: number;
+  // Parte de `skipped`: lo que se descartó por ser de otra provincia. Va
+  // aparte porque es el número que dice si el filtro de zona está haciendo su
+  // trabajo. Cuando no existía, esos shows se caían más adelante como "venue
+  // sin coordenadas" y se mezclaban con los que de verdad hay que cargar.
+  fueraDeZona?: number;
   // Desglose de `discarded`. Sin esto un venue que falta en VENUE_COORDS se cae
   // en silencio, que es como estuvimos perdiendo shows durante semanas sin
   // enterarnos: el contador subía pero no decía de qué.
@@ -453,6 +459,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
           scraped: number,
           skipped = 0,
           found?: number,
+          fueraDeZona = 0,
         ) {
           // Clasificamos los descartes antes de deduplicar, para poder decir
           // qué se cayó y por qué. Los venues desconocidos además van al log
@@ -503,6 +510,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
             upserted: kept.length,
             discarded: scraped - kept.length,
             ...(skipped ? { skipped } : {}),
+            ...(fueraDeZona ? { fueraDeZona } : {}),
             ...(Object.values(discardedBy).some((n) => n > 0) ? { discardedBy } : {}),
             ...(unknownVenues.size > 0 ? { unknownVenues: [...unknownVenues].sort() } : {}),
           };
@@ -562,22 +570,34 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
           try {
             const page = await fetchHtml(DALEPLAY_LIVE);
             const all = parseDalePlayLive(page);
+            // Dale Play vende en todo el país y el mapa es de la provincia de
+            // Buenos Aires. Antes esto se resolvía solo, y mal: los venues de
+            // Córdoba o Mendoza no estaban en VENUE_COORDS, así que se caían
+            // como "sin coordenadas" y ensuciaban `unknownVenues`, que es la
+            // lista de lugares que hay que cargar a mano. Diez entradas por
+            // corrida de shows que nunca íbamos a querer, tapando las dos o
+            // tres que sí. Y era frágil: bastaba cargar Arena Maipú para que
+            // Mendoza entrara al mapa.
+            const enZona = all.filter((ev) => !esDeOtraProvincia(ev.locality));
+            const fueraDeZona = all.length - enZona.length;
             // Si el show ya entró por otra ticketera (p.ej. Dale Play linkea a
             // All Access), no lo duplicamos.
-            const events = all.filter((ev) => !ev.buy_url || !buyUrlsElsewhere.has(ev.buy_url));
+            const events = enZona.filter((ev) => !ev.buy_url || !buyUrlsElsewhere.has(ev.buy_url));
+            const skipped = all.length - events.length;
 
             if (debug) {
               results["daleplay"] = {
                 found: all.length,
-                scraped: all.length,
+                scraped: events.length,
                 upserted: 0,
                 discarded: 0,
-                skipped: all.length - events.length,
+                skipped,
+                fueraDeZona,
                 parsedSample: events.slice(0, 5),
               };
             } else {
               const rows = events.map((ev) => toRow("daleplay", `${ev.buy_url}#${ev.date}`, ev));
-              await upsert("daleplay", rows, events.length, all.length - events.length, all.length);
+              await upsert("daleplay", rows, events.length, skipped, all.length, fueraDeZona);
             }
           } catch (err) {
             console.error("[ingest-concerts] daleplay failed", err);
@@ -766,11 +786,12 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
                 upserted: 0,
                 discarded: 0,
                 skipped,
+                fueraDeZona,
                 parsedSample: events.slice(0, 5),
               };
             } else {
               const rows = events.map((ev) => toRow("livepass", `${ev.buy_url}#${ev.date}`, ev));
-              await upsert("livepass", rows, events.length, skipped, links.length);
+              await upsert("livepass", rows, events.length, skipped, links.length, fueraDeZona);
             }
           } catch (err) {
             console.error("[ingest-concerts] livepass failed", err);

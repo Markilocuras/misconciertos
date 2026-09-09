@@ -11,13 +11,17 @@ import {
   parseLivePassEventLinks,
   parseLivePassEventPage,
   isBuenosAiresRegion,
+  esDeOtraProvincia,
   pareceNoMusical,
   esSlugBloqueado,
   slugify,
 } from "@/lib/ingest-parsers";
 
 // Los fixtures son la respuesta real de cada fuente, bajada el 06/09/2026 y
-// congelada. Eso es lo que los hace útiles: traen el encoding de verdad, las
+// congelada; el de Dale Play se refrescó el 09/09/2026, cuando empezó a
+// publicar venues con la ciudad pegada ("Arena Maipú | Mendoza") y hubo que
+// poder probar ese caso contra HTML de verdad.
+// Eso es lo que los hace útiles: traen el encoding de verdad, las
 // cards lazy mezcladas con las inline y las variantes de fecha que ninguna
 // documentación menciona.
 //
@@ -174,7 +178,7 @@ describe("parseDalePlayLive", () => {
   const eventos = parseDalePlayLive(fixture("daleplay-live.html"));
 
   it("saca los eventos de las cards", () => {
-    expect(eventos).toHaveLength(29);
+    expect(eventos).toHaveLength(62);
   });
 
   it("abre una card en varios eventos cuando el artista tiene varias fechas", () => {
@@ -193,6 +197,67 @@ describe("parseDalePlayLive", () => {
   it("separa el venue de la localidad", () => {
     expect(eventos[0].venue).toBe("Teatro Coliseo");
     expect(eventos[0].locality).toContain("CABA");
+  });
+
+  // Cuando el show es del interior, Dale Play mete la ciudad adentro del nombre
+  // del lugar: "Hipodromo de La Plata | La Plata". Eso rompía el match contra
+  // VENUE_COORDS —que compara por substring— y tiraba shows de lugares que
+  // estaban cargados. El Hipódromo de La Plata se perdió así corrida tras
+  // corrida mientras Live Pass lo publicaba sin problema.
+  it("saca del nombre del lugar la ciudad que Dale Play le pega con |", () => {
+    const hipodromo = eventos.find((e) => e.venue?.startsWith("Hipodromo de La Plata"));
+    expect(hipodromo).toBeDefined();
+    expect(hipodromo?.venue).toBe("Hipodromo de La Plata");
+    expect(hipodromo?.locality).toBe("La Plata");
+  });
+
+  it("usa esa ciudad como locality cuando no vino por el guion", () => {
+    const maipu = eventos.find((e) => e.venue === "Arena Maipú");
+    expect(maipu?.locality).toBe("Mendoza");
+  });
+
+  it("no le toca el nombre a los venues que vienen sin ciudad", () => {
+    expect(eventos.some((e) => e.venue === "Movistar Arena")).toBe(true);
+    for (const ev of eventos) expect(ev.venue).not.toContain(" | ");
+  });
+});
+
+// El mapa cubre toda la provincia de Buenos Aires: Junín y Bahía Blanca entran,
+// Córdoba y Mendoza no. Antes esto se resolvía de casualidad —los venues de
+// otras provincias no estaban en VENUE_COORDS y se caían como "sin
+// coordenadas"— y tenía dos costos: ensuciaba la lista de venues que hay que
+// cargar a mano, y bastaba cargar uno para que entraran shows de Mendoza.
+describe("esDeOtraProvincia", () => {
+  it("saca las ciudades de otras provincias", () => {
+    for (const ciudad of ["Mendoza", "Rosario", "CÓRDOBA", "Santa Fe", "Neuquén"]) {
+      expect(esDeOtraProvincia(ciudad)).toBe(true);
+    }
+  });
+
+  it("deja pasar la provincia de Buenos Aires entera, no solo el conurbano", () => {
+    for (const ciudad of ["CABA", "La Plata", "Junín", "Bahía Blanca", "Mar del Plata"]) {
+      expect(esDeOtraProvincia(ciudad)).toBe(false);
+    }
+  });
+
+  it("aguanta la basura que Dale Play le pega a la localidad", () => {
+    // Publica "CABA | 20hs": el horario metido en el campo de la ciudad.
+    expect(esDeOtraProvincia("CABA | 20hs")).toBe(false);
+  });
+
+  // Sin ciudad no se descarta: no saber de dónde es un show no alcanza para
+  // tirarlo. Si el lugar está en la tabla entra igual, y si no, queda anotado
+  // en unknownVenues, que es la lista de trabajo.
+  it("sin ciudad no descarta", () => {
+    expect(esDeOtraProvincia(null)).toBe(false);
+    expect(esDeOtraProvincia("")).toBe(false);
+  });
+
+  // Mira la ciudad y nunca el nombre del lugar, y por algo: en CABA hay una
+  // avenida Santa Fe y una calle Córdoba. Cruzar la lista contra el venue
+  // sacaría del mapa shows porteños.
+  it("no confunde una calle porteña con una provincia", () => {
+    expect(esDeOtraProvincia("Ciudad Autónoma de Buenos Aires")).toBe(false);
   });
 });
 

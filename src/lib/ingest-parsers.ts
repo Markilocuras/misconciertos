@@ -343,8 +343,20 @@ export function parseDalePlayLive(html: string): ScrapedEvent[] {
 
       const location = decodeHtmlEntities(locationMatch[1]);
       const dashIndex = location.lastIndexOf(" - ");
-      const venue = dashIndex > 0 ? location.slice(0, dashIndex).trim() : location;
-      const locality = dashIndex > 0 ? location.slice(dashIndex + 3).trim() : null;
+      const sinCiudad = dashIndex > 0 ? location.slice(0, dashIndex).trim() : location;
+      const localityDelGuion = dashIndex > 0 ? location.slice(dashIndex + 3).trim() : null;
+
+      // Cuando el show es del interior, Dale Play mete la ciudad adentro del
+      // nombre del lugar: "Arena Maipú | Mendoza", "Hipodromo de La Plata | La
+      // Plata". Eso no es parte del nombre y hace daño doble: ensucia la ficha,
+      // y rompe el match contra VENUE_COORDS —que compara por substring— así
+      // que hasta lugares cargados a mano se caían por no tener coordenada.
+      // Se separa: el nombre queda limpio y la ciudad pasa a ser la locality,
+      // que es donde sirve para decidir si el show entra.
+      const pipeIndex = sinCiudad.indexOf(" | ");
+      const venue = pipeIndex > 0 ? sinCiudad.slice(0, pipeIndex).trim() : sinCiudad;
+      const ciudadDelPipe = pipeIndex > 0 ? sinCiudad.slice(pipeIndex + 3).trim() : null;
+      const locality = localityDelGuion ?? ciudadDelPipe;
 
       events.push({
         title: artist,
@@ -550,6 +562,72 @@ export function isBuenosAiresRegion(region: string | null | undefined): boolean 
   const r = sinAcentos(region);
   if (/\b(caba|capital federal)\b/.test(r)) return true;
   return r.includes("buenos aires");
+}
+
+/**
+ * Ciudades y provincias que no son Buenos Aires.
+ *
+ * El mapa cubre toda la provincia, así que Junín, Bahía Blanca y Mar del Plata
+ * entran: esto saca lo de Córdoba, Mendoza, Santa Fe y compañía.
+ *
+ * Es una lista de rechazo y no de aceptación, y la diferencia importa. Una
+ * ciudad bonaerense que no figure acá igual entra, y si el lugar no tiene
+ * coordenada cae en `unknownVenues`, que es la lista de trabajo: se nota y se
+ * arregla. Una lista de aceptación haría lo contrario —dejar afuera en
+ * silencio cada suburbio que no se nos ocurrió— y el silencio es justo el modo
+ * de fallar que venimos peleando en esta ingesta.
+ */
+const OTRAS_PROVINCIAS = [
+  "cordoba",
+  "mendoza",
+  "rosario",
+  "santa fe",
+  "neuquen",
+  "corrientes",
+  "entre rios",
+  "parana",
+  "tucuman",
+  "salta",
+  "jujuy",
+  "chaco",
+  "resistencia",
+  "misiones",
+  "posadas",
+  "san juan",
+  "san luis",
+  "la pampa",
+  "santa rosa",
+  "chubut",
+  "comodoro",
+  "trelew",
+  "santa cruz",
+  "formosa",
+  "catamarca",
+  "la rioja",
+  "santiago del estero",
+  "bariloche",
+  "rio negro",
+  "ushuaia",
+  "tierra del fuego",
+];
+
+/**
+ * Si la ciudad que publica la fuente delata que el show es de otra provincia.
+ *
+ * Mira la locality y nunca el nombre del lugar, y eso es a propósito: en CABA
+ * hay una avenida Santa Fe y una calle Córdoba, así que cruzar esta lista
+ * contra el nombre del venue sacaría del mapa shows porteños.
+ *
+ * Sin ciudad devuelve false. No saber de dónde es un show no es motivo para
+ * tirarlo: si el lugar está en VENUE_COORDS entra, y si no, queda registrado
+ * como venue sin coordenadas.
+ */
+export function esDeOtraProvincia(locality: string | null | undefined): boolean {
+  if (!locality) return false;
+  const l = sinAcentos(locality);
+  // Dale Play manda cosas como "CABA | 20hs": si ya dice Buenos Aires, listo.
+  if (isBuenosAiresRegion(l)) return false;
+  return OTRAS_PROVINCIAS.some((p) => new RegExp(`\\b${p}\\b`).test(l));
 }
 
 // Live Pass manda los títulos de evento con los caracteres especiales pisados
