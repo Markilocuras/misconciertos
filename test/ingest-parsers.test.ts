@@ -234,6 +234,16 @@ describe("esDeOtraProvincia", () => {
     }
   });
 
+  // Los strings tal cual los publica cada fuente, copiados de una corrida real.
+  // Son más raros que los nombres prolijos de arriba: uno viene con el código
+  // postal adelante, otro sin acento, otro con la ciudad completa.
+  it("aguanta las formas reales que publican las fuentes", () => {
+    expect(esDeOtraProvincia("San Miguel de Tucumán")).toBe(true);
+    expect(esDeOtraProvincia("W3400 Corrientes")).toBe(true);
+    expect(esDeOtraProvincia("Cordoba")).toBe(true);
+    expect(esDeOtraProvincia("San Isidro, Buenos Aires")).toBe(false);
+  });
+
   it("deja pasar la provincia de Buenos Aires entera, no solo el conurbano", () => {
     for (const ciudad of ["CABA", "La Plata", "Junín", "Bahía Blanca", "Mar del Plata"]) {
       expect(esDeOtraProvincia(ciudad)).toBe(false);

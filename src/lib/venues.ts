@@ -112,6 +112,12 @@ export const VENUE_COORDS: Record<string, { lat: number; lng: number }> = {
   "teatro san carlos": { lat: -34.59207, lng: -60.94394 },
   // Martiniano Rodríguez 4985, Bahía Blanca.
   "dow center": { lat: -38.67947, lng: -62.21879 },
+  // All Access lo escribe "Malvinas Argentinas" a secas, y ni "estadio
+  // malvinas argentinas" ni "microestadio malvinas" son substring de eso, así
+  // que se caía aunque el lugar estuviera cargado dos veces. Es el de La
+  // Paternal: su locality dice CABA. Hay otro Malvinas Argentinas en Mendoza,
+  // pero ese no llega hasta acá — el filtro de provincia lo saca antes.
+  "malvinas argentinas": { lat: -34.5925, lng: -58.4718 },
   //
   // Club Estudiantes de Bahía Blanca queda deliberadamente afuera, aunque sale
   // en la lista. El match es por substring y Dale Play lo manda como "Club

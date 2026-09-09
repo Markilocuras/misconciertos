@@ -75,6 +75,9 @@ describe("findVenueCoords", () => {
       "City Rock",
       "Teatro San Carlos",
       "DOW Center",
+      // All Access lo escribe a secas y no matcheaba con ninguna de las dos
+      // claves largas que ya estaban en la tabla.
+      "Malvinas Argentinas",
     ]) {
       expect(isKnownVenue(venue), venue).toBe(true);
     }

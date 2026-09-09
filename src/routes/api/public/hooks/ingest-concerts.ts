@@ -526,11 +526,22 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
             const skipped = links.length - toFetch.length;
 
             const events: ScrapedEvent[] = [];
+            // All Access también vende en todo el país, y su JSON-LD publica la
+            // ciudad. Sin este filtro, Tucumán, Rosario, Corrientes y Córdoba
+            // llegaban hasta el final y se caían como "venue sin coordenada",
+            // que es la lista de lo que hay que cargar a mano: cuatro entradas
+            // por corrida de lugares que nunca íbamos a querer cargar.
+            let fueraDeZona = 0;
             for (const link of toFetch) {
               try {
                 const page = await fetchHtml(link);
                 const ev = parseAllAccessEventPage(page, link);
-                if (ev) events.push(ev);
+                if (!ev) continue;
+                if (esDeOtraProvincia(ev.locality)) {
+                  fueraDeZona += 1;
+                  continue;
+                }
+                events.push(ev);
               } catch (err) {
                 console.error(`[ingest-concerts] allaccess event ${link} failed`, err);
               }
@@ -542,7 +553,8 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
                 scraped: events.length,
                 upserted: 0,
                 discarded: 0,
-                skipped,
+                skipped: skipped + fueraDeZona,
+                fueraDeZona,
                 parsedSample: events.slice(0, 5),
               };
             } else {
@@ -552,7 +564,14 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
               for (const ev of events) {
                 if (ev.buy_url) buyUrlsElsewhere.add(ev.buy_url);
               }
-              await upsert("allaccess", rows, events.length, skipped, links.length);
+              await upsert(
+                "allaccess",
+                rows,
+                events.length,
+                skipped + fueraDeZona,
+                links.length,
+                fueraDeZona,
+              );
             }
           } catch (err) {
             console.error("[ingest-concerts] allaccess failed", err);
