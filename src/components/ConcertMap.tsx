@@ -4,7 +4,6 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { formatConcertDate, type Concert } from "@/data/concerts";
 import type { Coords } from "@/lib/concert-filters";
-import { isKnownVenue } from "@/lib/venues";
 
 function escapeHtml(input: string): string {
   return input
@@ -42,9 +41,19 @@ function groupByLocation(concerts: Concert[]): Group[] {
 // en el HTML del DivIcon.
 function groupIcon(group: Group, active: boolean): L.DivIcon {
   const venue = group.concerts[0].venue;
-  const label = isKnownVenue(venue)
-    ? `<div class="concert-pin-label">${escapeHtml(venue)}</div>`
-    : "";
+  // Se rotula todo pin que tenga nombre. Antes el rótulo dependía de que el
+  // venue estuviera en VENUE_COORDS, y eso era cierto cuando la tabla era la
+  // única forma de llegar al mapa: sin coordenada no había pin, así que "tiene
+  // pin" y "está en la tabla" eran lo mismo. Dejó de serlo cuando Live Pass
+  // empezó a publicar su propia coordenada en el JSON-LD, que la ingesta
+  // prefiere justamente para que entren salas que nadie cargó a mano. Esas
+  // salas entraban al mapa mudas: el Centro Cultural Nueva Uriarte, el XLR
+  // Club, el Teatro Argentino de La Plata, 51 de 192 shows sin nombre.
+  //
+  // No hace falta filtrar por nada más: en la base no hay conciertos sin venue,
+  // y el rótulo trunca con ellipsis a 140px, así que un nombre largo o una
+  // dirección cruda se ven feos pero no rompen el pin.
+  const label = venue ? `<div class="concert-pin-label">${escapeHtml(venue)}</div>` : "";
   // Todos los pines se ven igual, agrupen uno o veinte conciertos: cuántos hay
   // lo dice el mini menú al abrirlo.
   const size = active ? 36 : 28;
