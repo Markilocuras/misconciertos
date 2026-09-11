@@ -1,6 +1,10 @@
 // Coordenadas conocidas de venues de Buenos Aires y alrededores.
-// Compartido entre la ingesta (para geolocalizar eventos scrapeados) y el
-// mapa (para saber si un pin corresponde a un escenario conocido).
+//
+// La usa la ingesta, para geolocalizar lo scrapeado. El mapa no: lo dibuja con
+// la coordenada que ya trae cada fila. Lo aclara porque antes sí la consultaba
+// —para decidir si le ponía nombre al pin— y eso dejó mudas a todas las salas
+// que llegan con coordenada propia de la fuente, que hoy son un cuarto del
+// mapa. Estar o no en esta tabla no dice nada sobre cómo se muestra un lugar.
 //
 // Auditadas contra OpenStreetMap en agosto de 2026, después de que un usuario
 // reportara pines fuera de lugar. Las que quedaron son las que matchean un POI
