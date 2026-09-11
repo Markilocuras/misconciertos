@@ -97,6 +97,33 @@ export const VENUE_COORDS: Record<string, { lat: number; lng: number }> = {
   "mary teran de weiss": { lat: -34.6772, lng: -58.4462 },
   // Campus de San Justo, La Matanza.
   "universidad nacional de la matanza": { lat: -34.6672, lng: -58.5664 },
+  // Agregados el 09/09/2026, todos verificados en OSM. Salían en
+  // `unknownVenues` corrida tras corrida, o sea que eran shows reales que se
+  // caían. El mapa cubre toda la provincia de Buenos Aires, así que entran
+  // también los del interior.
+  // Calle 46, La Plata. Live Pass ya lo geolocalizaba con su propia
+  // coordenada; Dale Play no, y por eso lo perdíamos.
+  "hipodromo de la plata": { lat: -34.90127, lng: -57.9438 },
+  // Avenida 13, La Plata.
+  "club atenas": { lat: -34.92546, lng: -57.94973 },
+  // Av. Roque Sáenz Peña 449, Junín.
+  "city rock": { lat: -34.58534, lng: -60.94966 },
+  // Av. Arias, Junín.
+  "teatro san carlos": { lat: -34.59207, lng: -60.94394 },
+  // Martiniano Rodríguez 4985, Bahía Blanca.
+  "dow center": { lat: -38.67947, lng: -62.21879 },
+  // All Access lo escribe "Malvinas Argentinas" a secas, y ni "estadio
+  // malvinas argentinas" ni "microestadio malvinas" son substring de eso, así
+  // que se caía aunque el lugar estuviera cargado dos veces. Es el de La
+  // Paternal: su locality dice CABA. Hay otro Malvinas Argentinas en Mendoza,
+  // pero ese no llega hasta acá — el filtro de provincia lo saca antes.
+  "malvinas argentinas": { lat: -34.5925, lng: -58.4718 },
+  //
+  // Club Estudiantes de Bahía Blanca queda deliberadamente afuera, aunque sale
+  // en la lista. El match es por substring y Dale Play lo manda como "Club
+  // Estudiantes" a secas: una clave así se comería también a Estudiantes de La
+  // Plata y le pondría el pin a 270 km. Un show que falta se nota menos que un
+  // pin mal puesto, que es de donde salió la auditoría de arriba.
 };
 
 // "Teatro Ópera", "Vélez", "Tecnópolis" → sin acentos ni mayúsculas, para que

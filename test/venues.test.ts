@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findVenueCoords, isKnownVenue, normalizeVenueName } from "@/lib/venues";
+import { VENUE_COORDS, findVenueCoords, isKnownVenue, normalizeVenueName } from "@/lib/venues";
 
 // Un venue sin coordenadas se descarta en la ingesta, así que cada fallo de
 // matching acá es un recital que no llega al mapa. En agosto de 2026 eso estaba
@@ -63,6 +63,44 @@ describe("findVenueCoords", () => {
       expect(lat, venue).toBeLessThan(-34);
       expect(lng, venue).toBeGreaterThan(-59);
       expect(lng, venue).toBeLessThan(-57.5);
+    }
+  });
+
+  it("conoce los venues del interior que se agregaron el 09/09", () => {
+    // Salían en unknownVenues corrida tras corrida: eran shows reales que se
+    // caían por no tener coordenada.
+    for (const venue of [
+      "Hipodromo de La Plata",
+      "Club Atenas",
+      "City Rock",
+      "Teatro San Carlos",
+      "DOW Center",
+      // All Access lo escribe a secas y no matcheaba con ninguna de las dos
+      // claves largas que ya estaban en la tabla.
+      "Malvinas Argentinas",
+    ]) {
+      expect(isKnownVenue(venue), venue).toBe(true);
+    }
+  });
+
+  it("no deja que un nombre corto se coma a otro venue", () => {
+    // Club Estudiantes de Bahía Blanca quedó deliberadamente fuera de la tabla:
+    // Dale Play lo manda como "Club Estudiantes" a secas y una clave así le
+    // pondría también el pin a Estudiantes de La Plata, a 270 km. Si alguien lo
+    // agrega sin resolver la ambigüedad, esto avisa.
+    expect(isKnownVenue("Club Estudiantes")).toBe(false);
+  });
+
+  // La de arriba mira cuatro venues elegidos a mano; esta mira la tabla entera,
+  // que es donde un dedo torcido pasa desapercibido. El mapa cubre toda la
+  // provincia de Buenos Aires, así que la caja es la provincia: de Bahía Blanca
+  // al sur hasta el norte bonaerense, y de Junín al este hasta la costa.
+  it("ninguna coordenada de la tabla se va de la provincia", () => {
+    for (const [nombre, { lat, lng }] of Object.entries(VENUE_COORDS)) {
+      expect(lat, nombre).toBeGreaterThan(-41.1);
+      expect(lat, nombre).toBeLessThan(-33.2);
+      expect(lng, nombre).toBeGreaterThan(-63.4);
+      expect(lng, nombre).toBeLessThan(-56.6);
     }
   });
 });
