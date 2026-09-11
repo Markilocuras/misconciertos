@@ -12,9 +12,22 @@ import { toast } from "sonner";
 type Mode = "login" | "register";
 
 export const Route = createFileRoute("/auth")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    mode: (search.mode === "register" ? "register" : "login") as Mode,
-  }),
+  // `avisos` llega en true desde la tarjeta que invita a registrarse en el
+  // mapa, que ofrece los mails de conciertos nuevos, y deja tildada la casilla.
+  // Si arrancara apagada esa tarjeta prometería algo que no pasa: el trigger
+  // que suscribe al digest solo corre cuando el alta viaja con
+  // notify_new_concerts en true.
+  //
+  // Va opcional y solo se emite cuando es true, por dos motivos: así los Link a
+  // /auth que hay repartidos por la app no tienen que pasarlo, y la URL no se
+  // ensucia con un `avisos=false` que no significa nada.
+  validateSearch: (search: Record<string, unknown>): { mode: Mode; avisos?: true } => {
+    const avisos = search.avisos === true || search.avisos === "1" || search.avisos === "true";
+    return {
+      mode: (search.mode === "register" ? "register" : "login") as Mode,
+      ...(avisos ? { avisos: true as const } : {}),
+    };
+  },
   head: () => ({
     meta: [
       { title: "Acceder — misconciertos" },
@@ -37,12 +50,12 @@ export const Route = createFileRoute("/auth")({
 });
 
 function AuthPage() {
-  const { mode } = Route.useSearch();
+  const { mode, avisos } = Route.useSearch();
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
-  const [notify, setNotify] = useState(false);
+  const [notify, setNotify] = useState(avisos ?? false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   // Sobrevive al cambio de mode porque es la misma ruta: el componente no se
