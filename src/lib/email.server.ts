@@ -1,3 +1,4 @@
+import { describeError } from "@/lib/describe-error";
 import { SITE_URL } from "@/lib/site";
 
 // Envío de mails vía Resend. Server-only: la API key vive en los secrets del
@@ -159,7 +160,7 @@ export async function sendNewConcertsDigest(
       sent += chunk.length;
     } catch (err) {
       failed += chunk.length;
-      firstError ??= err instanceof Error ? err.message : String(err);
+      firstError ??= describeError(err);
       console.error("[email] resend batch threw", err);
     }
   }
@@ -195,16 +196,37 @@ function alertaHtml(fuentes: FuenteCaida[]): string {
     })
     .join("");
 
-  return `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;color:#1a1a24">
-    <h2 style="font-size:18px;margin:0 0 4px">Una fuente de conciertos dejó de traer datos</h2>
-    <p style="color:#666;font-size:14px;margin:0 0 16px">Corrida de la ingesta en ${escapeHtml(SITE_URL)}</p>
-    <ul style="font-size:15px;padding-left:20px;margin:0 0 20px">${filas}</ul>
-    <p style="font-size:14px;line-height:1.5;color:#333">
-      Cuando una fuente responde bien pero no devuelve eventos, casi siempre cambió su HTML
+  // El consejo depende de cómo falló, y antes no: el mail mandaba siempre a
+  // `?debug=1`, que para una fuente que tiró error es el peor lugar posible.
+  // Ese modo saltea la escritura en la base a propósito, así que si la corrida
+  // se cayó justo ahí, debug vuelve verde y uno concluye que no pasaba nada.
+  const hayVacias = fuentes.some((f) => !f.error);
+  const hayErrores = fuentes.some((f) => f.error);
+
+  const consejoVacias = `<p style="font-size:14px;line-height:1.5;color:#333">
+      Una fuente que respondió bien pero no devolvió eventos casi siempre cambió su HTML
       y el parser dejó de matchear. Para ver qué está llegando:
     </p>
     <pre style="background:#f4f4f6;padding:10px;border-radius:6px;font-size:12px;overflow-x:auto">POST ${escapeHtml(SITE_URL)}/api/public/hooks/ingest-concerts?debug=1</pre>
-    <p style="font-size:13px;color:#888">Ese modo parsea todo y devuelve una muestra, sin escribir en la base.</p>
+    <p style="font-size:13px;color:#888">Ese modo parsea todo y devuelve una muestra, sin escribir en la base.</p>`;
+
+  const consejoErrores = `<p style="font-size:14px;line-height:1.5;color:#333">
+      Una fuente que cortó con error no llegó a terminar la corrida, y el mensaje de arriba es
+      todo lo que quedó: los logs del Worker no se guardan solos. Para ver el próximo entero,
+      dejá esto corriendo y disparala a mano:
+    </p>
+    <pre style="background:#f4f4f6;padding:10px;border-radius:6px;font-size:12px;overflow-x:auto">npx wrangler tail</pre>
+    <p style="font-size:13px;color:#888">
+      Ojo con <code>?debug=1</code> acá: saltea la escritura en la base, así que si la corrida se
+      cayó ahí, debug va a volver verde igual.
+    </p>`;
+
+  return `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;color:#1a1a24">
+    <h2 style="font-size:18px;margin:0 0 4px">${hayErrores && !hayVacias ? "Falló una fuente de conciertos" : "Una fuente de conciertos dejó de traer datos"}</h2>
+    <p style="color:#666;font-size:14px;margin:0 0 16px">Corrida de la ingesta en ${escapeHtml(SITE_URL)}</p>
+    <ul style="font-size:15px;padding-left:20px;margin:0 0 20px">${filas}</ul>
+    ${hayVacias ? consejoVacias : ""}
+    ${hayErrores ? consejoErrores : ""}
   </div>`;
 }
 
@@ -215,14 +237,33 @@ function alertaTexto(fuentes: FuenteCaida[]): string {
         `- ${f.source}: ${f.error ? `falló con: ${f.error}` : "respondió bien pero el parser no encontró ningún evento"}`,
     )
     .join("\n");
+  const hayVacias = fuentes.some((f) => !f.error);
+  const hayErrores = fuentes.some((f) => f.error);
+
   return [
-    "Una fuente de conciertos dejó de traer datos.",
+    hayErrores && !hayVacias
+      ? "Falló una fuente de conciertos."
+      : "Una fuente de conciertos dejó de traer datos.",
     "",
     filas,
-    "",
-    "Cuando una fuente responde bien pero no devuelve eventos, casi siempre cambió su HTML.",
-    `Para ver qué está llegando: POST ${SITE_URL}/api/public/hooks/ingest-concerts?debug=1`,
-    "(ese modo parsea todo y devuelve una muestra, sin escribir en la base)",
+    ...(hayVacias
+      ? [
+          "",
+          "Una fuente que responde bien pero no devuelve eventos casi siempre cambió su HTML.",
+          `Para ver qué está llegando: POST ${SITE_URL}/api/public/hooks/ingest-concerts?debug=1`,
+          "(ese modo parsea todo y devuelve una muestra, sin escribir en la base)",
+        ]
+      : []),
+    ...(hayErrores
+      ? [
+          "",
+          "Una fuente que cortó con error no terminó la corrida, y el mensaje de arriba es todo lo",
+          "que quedó: los logs del Worker no se guardan solos. Para ver el próximo entero, dejá",
+          "`npx wrangler tail` corriendo y disparala a mano.",
+          "Ojo con ?debug=1 acá: saltea la escritura en la base, así que si la corrida se cayó ahí,",
+          "debug va a volver verde igual.",
+        ]
+      : []),
   ].join("\n");
 }
 
@@ -241,7 +282,11 @@ export async function sendIngestAlert(
       body: JSON.stringify({
         from: FROM,
         to: [to],
-        subject: `misconciertos — sin datos de ${nombres}`,
+        // El asunto es lo único que se ve sin abrir: que diga cuál de los dos
+        // problemas es. "Sin datos" y "falló" se arreglan en lugares distintos.
+        subject: fuentes.every((f) => f.error)
+          ? `misconciertos — falló la ingesta de ${nombres}`
+          : `misconciertos — sin datos de ${nombres}`,
         html: alertaHtml(fuentes),
         text: alertaTexto(fuentes),
       }),
@@ -254,6 +299,6 @@ export async function sendIngestAlert(
     return { sent: true };
   } catch (err) {
     console.error("[email] alerta de ingesta tiró", err);
-    return { sent: false, error: err instanceof Error ? err.message : String(err) };
+    return { sent: false, error: describeError(err) };
   }
 }

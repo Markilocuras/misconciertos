@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { todayInBuenosAires } from "@/lib/timezone";
+import { describeError } from "@/lib/describe-error";
 import { resolveSpotifyArtistIds } from "@/lib/spotify";
 import { findVenueCoords } from "@/lib/venues";
 import {
@@ -579,7 +580,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
               scraped: 0,
               upserted: 0,
               discarded: 0,
-              error: err instanceof Error ? err.message : String(err),
+              error: describeError(err),
             };
           }
         }
@@ -624,7 +625,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
               scraped: 0,
               upserted: 0,
               discarded: 0,
-              error: err instanceof Error ? err.message : String(err),
+              error: describeError(err),
             };
           }
         }
@@ -745,7 +746,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
               scraped: 0,
               upserted: 0,
               discarded: 0,
-              error: err instanceof Error ? err.message : String(err),
+              error: describeError(err),
             };
           }
         }
@@ -818,7 +819,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
               scraped: 0,
               upserted: 0,
               discarded: 0,
-              error: err instanceof Error ? err.message : String(err),
+              error: describeError(err),
             };
           }
         }
@@ -873,7 +874,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
               scraped: 0,
               upserted: 0,
               discarded: 0,
-              error: err instanceof Error ? err.message : String(err),
+              error: describeError(err),
             };
           }
         }
