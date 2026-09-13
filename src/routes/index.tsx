@@ -8,6 +8,7 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConcertDetails } from "@/components/ConcertDetails";
 import { MapFilters } from "@/components/MapFilters";
+import { SignupInvite } from "@/components/SignupInvite";
 import { SiteFooter } from "@/components/SiteFooter";
 import { toConcert, formatConcertDate, type Concert } from "@/data/concerts";
 import { listConcerts } from "@/lib/concerts.functions";
@@ -408,6 +409,10 @@ function Index() {
             />
           </div>
         </div>
+
+        {/* Va siempre montada y se esconde sola con `paused`: ver el comentario
+            en SignupInvite sobre por qué no se la desmonta desde acá. */}
+        <SignupInvite paused={!!selected} />
 
         {selected && (
           <>
