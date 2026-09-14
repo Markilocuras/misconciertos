@@ -151,3 +151,26 @@ export function findVenueCoords(venue: string | null | undefined): {
 export function isKnownVenue(venue: string | null | undefined): boolean {
   return findVenueCoords(venue).lat != null;
 }
+
+/**
+ * Caja de la provincia de Buenos Aires, CABA incluida.
+ *
+ * Es la última red antes del mapa, y hace falta porque las coordenadas que
+ * publican las fuentes no siempre son de acá. Tu Entrada trae la del Anfiteatro
+ * Municipal de Rosario —real, bien puesta, y en Santa Fe— y el filtro por
+ * ciudad no la agarra: esa ficha no dice de qué ciudad es.
+ *
+ * Los límites son los de la provincia: del norte bonaerense (Rosario queda
+ * afuera por 25 km) hasta el río Negro, y de La Pampa al Atlántico.
+ */
+const CAJA_BUENOS_AIRES = { latMin: -41.1, latMax: -33.2, lngMin: -63.4, lngMax: -56.6 };
+
+export function estaEnBuenosAires(lat: number | null, lng: number | null): boolean {
+  if (lat == null || lng == null) return false;
+  return (
+    lat > CAJA_BUENOS_AIRES.latMin &&
+    lat < CAJA_BUENOS_AIRES.latMax &&
+    lng > CAJA_BUENOS_AIRES.lngMin &&
+    lng < CAJA_BUENOS_AIRES.lngMax
+  );
+}
