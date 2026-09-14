@@ -101,9 +101,31 @@ Cada fuente reporta `found`/`scraped`/`upserted`/`discarded`/`skipped`, más `fu
 
 **`found` es el número que importa para saber si una fuente se rompió**: es lo que el parser sacó del listado antes de descartar por conocidos, por provincia o por tope de fetches. `scraped` baja a cero solo cualquier día tranquilo, así que no sirve de señal; `found: 0` significa que la fuente cambió su HTML o dejó de responder lo esperado. Cuando eso pasa, la corrida manda un mail a `ALERT_EMAIL` (ver `sendIngestAlert`) y deja un `console.warn` en el log del Worker.
 
-**El presupuesto de subrequests es el límite real de la ingesta.** Cloudflare corta la invocación a los 50 y ahí entra todo: los fetches a las fuentes, cada llamada a Supabase y cada mail. Cuando se pasa, lo que corre último trae 0 y el mail de aviso falla, todo en silencio. Es lo que empujó la resolución de ids de Spotify fuera del scrapeo (la hace el cron `spotify-backfill-daily`), lo que puso topes de fetches a allaccess, ticketek y livepass, y lo que terminó partiendo la ingesta en una invocación por fuente.
+## Los dos techos de Cloudflare
 
-Los topes y el modelo de costo viven en `src/lib/ingest-sources.ts`, y `test/ingest-sources.test.ts` verifica que el peor caso de cada modo entre en los 50. Ese test es el único lugar donde se nota antes de tiempo que un tope quedó grande: en producción el síntoma es silencio. Si vas a subir un tope o sumar una fuente, el número que tiene que seguir cerrando es ese.
+Este proyecto se chocó con los dos, y los dos fallan igual de mal: sin error en el código, sin nada raro en los tests, y con un síntoma que aparece tarde. Vale conocerlos antes de tocar la ingesta o el render.
+
+**Desde el 14/09/2026 la cuenta está en Workers Paid** (US$5/mes). No es un lujo: el plan gratuito no alcanzaba para servir el sitio, y eso tiró la producción entera. Los números de abajo son de ese plan.
+
+**1. Subrequests — el límite de la ingesta.** Cada invocación del Worker tiene un tope de subrequests, y ahí entra todo: los fetches a las fuentes, cada llamada a Supabase y cada mail. Cuando se pasa, lo que corre último trae 0 y el mail de aviso falla, todo en silencio.
+
+Eran **50** en el plan gratuito, y esa restricción moldeó media arquitectura: sacó la resolución de ids de Spotify del scrapeo (hoy la hace el cron `spotify-backfill-daily`), puso topes de fetches a allaccess, ticketek y livepass, y terminó partiendo la ingesta en una invocación por fuente. Ahora son **1000**, y con eso cada fuente recorre su listado entero en una corrida: los topes de `TOPES` están dimensionados para eso.
+
+Los topes y el modelo de costo viven en `src/lib/ingest-sources.ts`, y `test/ingest-sources.test.ts` verifica que el peor caso entre. Ese test es el único lugar donde se nota antes de tiempo que un tope quedó grande: en producción el síntoma es silencio. Si vas a subir un tope o sumar una fuente, el número que tiene que seguir cerrando es ese.
+
+Con topes de tres cifras los fetches ya no pueden ir de a uno: en serie, 150 páginas son más de un minuto y el `net.http_post` del cron corta a los 60s (el Worker termina igual, pero queda registrado como timeout y parece una falla que no fue). Van de a seis con `enTandas` (`src/lib/en-tandas.ts`), que conserva el orden del listado y no deja que una página rota se lleve puesta la corrida.
+
+**2. CPU por request — el límite del sitio.** El render SSR de una página cuesta CPU, y crece con el catálogo. Medido el 14/09/2026 con `npx wrangler tail`:
+
+| Ruta | CPU |
+|---|---|
+| `/` | 104 ms |
+| `/agenda` | 68 ms |
+| `/conciertos` | 144 ms |
+
+El plan gratuito daba **10 ms**, o sea diez veces menos de lo que la home necesita. Mientras el catálogo fue chico el sitio anduvo; cuando llegó a ~200 conciertos futuros cruzó la línea y **todas las páginas con SSR empezaron a devolver 503** (`Error 1102 — Worker exceeded resource limits`). El plan pago da 30 s, así que hoy sobra muchísimo.
+
+Dos cosas que aprendimos ahí y conviene no volver a aprender: cuando el Worker muere por CPU, `wrangler tail` reporta `cpuTime` **cortado en el límite**, no el costo real — con 10 ms de techo parecía que faltaban 2 ms cuando en realidad faltaban 94. Y no hay recorte de datos que arregle eso: el piso del render de React ya se come el presupuesto, así que la única salida era el plan. Si algún día vuelve a aparecer un 1102, mirar el `cpuTime` real con el plan pago antes de sacar conclusiones.
 
 **Env vars**: client-visible ones are `VITE_`-prefixed (`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, `VITE_SUPABASE_PROJECT_ID`); server-only equivalents are unprefixed (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_PROJECT_ID`) plus `SUPABASE_SERVICE_ROLE_KEY`, `RESEND_API_KEY` y `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET`, que viven en los secrets del Worker y no en el `.env` local. `VITE_CARTO_API_KEY` es la clave de los basemaps de Carto: Vite la resuelve en build time, así que tiene que estar en `.env` **antes** de buildear o el mapa sale con la marca de agua de "API KEY REQUIRED".
 

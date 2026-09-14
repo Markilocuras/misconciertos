@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { todayInBuenosAires } from "@/lib/timezone";
 import { describeError } from "@/lib/describe-error";
+import { enTandas } from "@/lib/en-tandas";
 import { resolveSpotifyArtistIds } from "@/lib/spotify";
 import { findVenueCoords } from "@/lib/venues";
 import {
@@ -11,7 +12,7 @@ import {
   type DigestRecipient,
   type FuenteCaida,
 } from "@/lib/email.server";
-import { selectSources, TOPES_JUNTAS, TOPES_SOLO, type IngestSource } from "@/lib/ingest-sources";
+import { selectSources, TOPES, type IngestSource } from "@/lib/ingest-sources";
 import {
   parseAllEventsListing,
   isBuenosAiresRegion,
@@ -46,13 +47,13 @@ const DALEPLAY_LIVE = "https://daleplay.la/live-shows/live/";
 const LIVEPASS_LISTING = "https://livepass.com.ar/taxons/show";
 
 // Los topes de fetches por fuente viven en @/lib/ingest-sources, junto al
-// modelo de costo y al test que verifica que el peor caso entra en los 50
-// subrequests de Cloudflare. Cuál de los dos juegos se usa lo decide `?source=`:
-// una fuente sola tiene los 50 para ella, las cinco juntas se los reparten.
+// modelo de costo y al test que verifica que el peor caso entre en el techo de
+// subrequests de Cloudflare, que desde el plan pago es 1000.
 //
-// Backfill de ids de Spotify (?spotify=1). Va en su propia invocación desde que
-// resolverlos dentro del scrapeo reventaba el techo: por cada artista distinto
-// sale una búsqueda mas un update, o sea dos subrequests.
+// Backfill de ids de Spotify (?spotify=1). Sigue en su propia invocación, y ya
+// no por presupuesto: mezclarlo con el scrapeo hacía que cada corrida pisara
+// con null los ids que el backfill ya había resuelto. El tope de acá es para
+// no castigar a Spotify con una ráfaga, no por Cloudflare.
 const MAX_SPOTIFY_BACKFILL_ARTISTS = 18;
 
 const BROWSER_HEADERS = {
@@ -379,7 +380,6 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
             headers: { "Content-Type": "application/json" },
           });
         }
-        const topes = seleccion.solo ? TOPES_SOLO : TOPES_JUNTAS;
         const correr = (s: IngestSource) => seleccion.sources.includes(s);
 
         // Filas futuras ya conocidas: evita re-fetchear páginas de evento de
@@ -523,30 +523,28 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
             const home = await fetchHtml(ALLACCESS_HOME);
             const links = extractAllAccessEventLinks(home);
             const newLinks = links.filter((l) => !knownAllAccessUrls.has(l));
-            const toFetch = newLinks.slice(0, topes.allaccessEventos);
+            const toFetch = newLinks.slice(0, TOPES.allaccessEventos);
             const skipped = links.length - toFetch.length;
 
-            const events: ScrapedEvent[] = [];
             // All Access también vende en todo el país, y su JSON-LD publica la
             // ciudad. Sin este filtro, Tucumán, Rosario, Corrientes y Córdoba
             // llegaban hasta el final y se caían como "venue sin coordenada",
             // que es la lista de lo que hay que cargar a mano: cuatro entradas
             // por corrida de lugares que nunca íbamos a querer cargar.
             let fueraDeZona = 0;
-            for (const link of toFetch) {
-              try {
-                const page = await fetchHtml(link);
-                const ev = parseAllAccessEventPage(page, link);
-                if (!ev) continue;
+            const events = await enTandas(
+              toFetch,
+              async (link) => {
+                const ev = parseAllAccessEventPage(await fetchHtml(link), link);
+                if (!ev) return null;
                 if (esDeOtraProvincia(ev.locality)) {
                   fueraDeZona += 1;
-                  continue;
+                  return null;
                 }
-                events.push(ev);
-              } catch (err) {
-                console.error(`[ingest-concerts] allaccess event ${link} failed`, err);
-              }
-            }
+                return ev;
+              },
+              (link, err) => console.error(`[ingest-concerts] allaccess event ${link} failed`, err),
+            );
 
             if (debug) {
               results["allaccess"] = {
@@ -660,24 +658,31 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
             }
             const artistPages = baItems
               .filter((i) => !i.url.includes("/"))
-              .slice(0, topes.ticketekArtistas);
-            for (const item of artistPages) {
-              try {
-                const artistJson = await fetchJson(ticketekApiUrl(item.url));
-                for (const show of parseTicketekArtistShows(artistJson)) {
-                  const locality = show.locality ?? "";
-                  if (!/^(Capital Federal|Buenos Aires)/.test(locality)) continue;
-                  if (!candidates.has(show.link)) {
-                    candidates.set(show.link, {
-                      link: show.link,
-                      name: item.name,
-                      venue: show.venue ?? item.venue,
-                      image: show.image ?? item.image,
-                    });
-                  }
+              .slice(0, TOPES.ticketekArtistas);
+            const porArtista = await enTandas(
+              artistPages,
+              async (item) => ({
+                item,
+                shows: parseTicketekArtistShows(await fetchJson(ticketekApiUrl(item.url))),
+              }),
+              (item, err) =>
+                console.error(`[ingest-concerts] ticketek artist ${item.url} failed`, err),
+            );
+            // El merge va acá afuera y en orden, no adentro de las tandas: la
+            // regla es "el primero que aparece gana", y eso tiene que depender
+            // del orden del listado y no de cuál fetch volvió antes.
+            for (const { item, shows } of porArtista) {
+              for (const show of shows) {
+                const locality = show.locality ?? "";
+                if (!/^(Capital Federal|Buenos Aires)/.test(locality)) continue;
+                if (!candidates.has(show.link)) {
+                  candidates.set(show.link, {
+                    link: show.link,
+                    name: item.name,
+                    venue: show.venue ?? item.venue,
+                    image: show.image ?? item.image,
+                  });
                 }
-              } catch (err) {
-                console.error(`[ingest-concerts] ticketek artist ${item.url} failed`, err);
               }
             }
 
@@ -688,35 +693,40 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
             );
             const toFetch = [...candidates.values()]
               .filter((c) => !knownTicketekUrls.has(`${TICKETEK_SITE}/${c.link}`))
-              .slice(0, topes.ticketekShows);
+              .slice(0, TOPES.ticketekShows);
             const skipped = candidates.size - toFetch.length;
 
+            const porShow = await enTandas(
+              toFetch,
+              async (candidate) => ({
+                candidate,
+                perfs: parseTicketekShow(await fetchJson(ticketekApiUrl(candidate.link))),
+              }),
+              (candidate, err) =>
+                console.error(`[ingest-concerts] ticketek show ${candidate.link} failed`, err),
+            );
+
             const events: ScrapedEvent[] = [];
-            for (const candidate of toFetch) {
-              try {
-                const showJson = await fetchJson(ticketekApiUrl(candidate.link));
-                const buyUrl = `${TICKETEK_SITE}/${candidate.link}`;
-                for (const perf of parseTicketekShow(showJson)) {
-                  events.push({
-                    title: candidate.name,
-                    artist: candidate.name,
-                    venue: candidate.venue,
-                    date: perf.date,
-                    time: perf.time,
-                    price: perf.price,
-                    // Ticketek no trae descripción y fabricarla acá como
-                    // "Concierto en {venue}." dejaba 31 fichas del Movistar Arena
-                    // diciendo exactamente lo mismo. El texto de la ficha se
-                    // compone al renderizar, con los datos de la fila: ver
-                    // src/lib/concert-copy.ts.
-                    description: null,
-                    image_url: candidate.image,
-                    buy_url: buyUrl,
-                    locality: null,
-                  });
-                }
-              } catch (err) {
-                console.error(`[ingest-concerts] ticketek show ${candidate.link} failed`, err);
+            for (const { candidate, perfs } of porShow) {
+              const buyUrl = `${TICKETEK_SITE}/${candidate.link}`;
+              for (const perf of perfs) {
+                events.push({
+                  title: candidate.name,
+                  artist: candidate.name,
+                  venue: candidate.venue,
+                  date: perf.date,
+                  time: perf.time,
+                  price: perf.price,
+                  // Ticketek no trae descripción y fabricarla acá como
+                  // "Concierto en {venue}." dejaba 31 fichas del Movistar Arena
+                  // diciendo exactamente lo mismo. El texto de la ficha se
+                  // compone al renderizar, con los datos de la fila: ver
+                  // src/lib/concert-copy.ts.
+                  description: null,
+                  image_url: candidate.image,
+                  buy_url: buyUrl,
+                  locality: null,
+                });
               }
             }
 
@@ -766,33 +776,32 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
             // El bloqueo por slug va antes que todo: asi no se gasta un fetch en
             // una pagina que de todas formas se iba a descartar.
             const nuevos = links.filter((l) => !knownLivePassUrls.has(l) && !esSlugBloqueado(l));
-            const toFetch = nuevos.slice(0, topes.livepassEventos);
+            const toFetch = nuevos.slice(0, TOPES.livepassEventos);
 
-            const events: ScrapedEvent[] = [];
             let fueraDeZona = 0;
             let noMusicales = 0;
-            for (const link of toFetch) {
-              try {
+            const events = await enTandas(
+              toFetch,
+              async (link) => {
                 const ev = parseLivePassEventPage(await fetchHtml(link), link);
-                if (!ev) continue;
+                if (!ev) return null;
                 // Live Pass vende en todo el país y esto es un mapa de Buenos
                 // Aires: sin el filtro entran Córdoba, Neuquén y compañía.
                 if (!isBuenosAiresRegion(ev.region)) {
                   fueraDeZona += 1;
-                  continue;
+                  return null;
                 }
                 // Y vende de todo, no solo música: su listado mezcla recitales con
                 // teatro, ballet y stand-up. Ver pareceNoMusical, que es un colador
                 // y no un filtro: algo se va a colar igual.
                 if (pareceNoMusical(ev.title)) {
                   noMusicales += 1;
-                  continue;
+                  return null;
                 }
-                events.push(ev);
-              } catch (err) {
-                console.error(`[ingest-concerts] livepass event ${link} failed`, err);
-              }
-            }
+                return ev;
+              },
+              (link, err) => console.error(`[ingest-concerts] livepass event ${link} failed`, err),
+            );
 
             // Lo salteado son los links que no se miraron en esta corrida: los que
             // ya estaban más los que quedaron fuera del tope, más los que se
