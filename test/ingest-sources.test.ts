@@ -2,8 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import {
   INGEST_SOURCES,
-  TOPES_JUNTAS,
-  TOPES_SOLO,
+  TOPES,
   TOPE_SUBREQUESTS,
   selectSources,
   subrequestsPeorCaso,
@@ -59,17 +58,31 @@ describe("selectSources", () => {
 describe("presupuesto de subrequests", () => {
   it("cada fuente sola entra en el techo de Cloudflare", () => {
     for (const source of INGEST_SOURCES) {
-      expect(subrequestsPeorCaso([source], TOPES_SOLO)).toBeLessThanOrEqual(TOPE_SUBREQUESTS);
+      expect(subrequestsPeorCaso([source], TOPES)).toBeLessThanOrEqual(TOPE_SUBREQUESTS);
     }
   });
 
-  it("las cinco juntas tambien entran, con los topes chicos", () => {
-    expect(subrequestsPeorCaso(INGEST_SOURCES, TOPES_JUNTAS)).toBeLessThanOrEqual(TOPE_SUBREQUESTS);
+  // Con 1000 no hace falta un juego de topes mas chico para el modo manual:
+  // las cinco juntas entran con los mismos numeros que una sola.
+  it("las cinco juntas tambien entran, con los mismos topes", () => {
+    expect(subrequestsPeorCaso(INGEST_SOURCES, TOPES)).toBeLessThanOrEqual(TOPE_SUBREQUESTS);
   });
 
-  // Si los topes de las cinco juntas fueran los de una sola, no entrarian: es
-  // exactamente el estado del que venimos, y el motivo de partir la ingesta.
-  it("las cinco juntas NO entrarian con los topes de una sola", () => {
-    expect(subrequestsPeorCaso(INGEST_SOURCES, TOPES_SOLO)).toBeGreaterThan(TOPE_SUBREQUESTS);
+  // El techo subio de 50 a 1000 pero no desaparecio, y este es el test que lo
+  // recuerda. Con los topes de hoy el peor caso queda bien abajo: si alguien
+  // los sube hasta rozarlo, que sea con esto en rojo y no con una corrida que
+  // devuelve cero en silencio.
+  it("deja margen de sobra, no entra raspando", () => {
+    const peorCaso = subrequestsPeorCaso(INGEST_SOURCES, TOPES);
+    expect(peorCaso).toBeLessThan(TOPE_SUBREQUESTS * 0.75);
+  });
+
+  // Los topes tienen que alcanzar para el listado entero de cada fuente, que es
+  // todo el punto de haber pasado al plan pago: hoy Live Pass publica ~88
+  // links, All Access ~25 y Ticketek ~63 items.
+  it("los topes cubren de sobra lo que las fuentes publican hoy", () => {
+    expect(TOPES.livepassEventos).toBeGreaterThanOrEqual(88);
+    expect(TOPES.allaccessEventos).toBeGreaterThanOrEqual(25);
+    expect(TOPES.ticketekArtistas + TOPES.ticketekShows).toBeGreaterThanOrEqual(63);
   });
 });
