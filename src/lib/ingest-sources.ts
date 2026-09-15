@@ -16,6 +16,7 @@ export const INGEST_SOURCES = [
   "daleplay",
   "ticketek",
   "livepass",
+  "tuentrada",
   "allevents",
 ] as const;
 
@@ -73,6 +74,7 @@ export type Topes = {
   ticketekArtistas: number;
   ticketekShows: number;
   livepassEventos: number;
+  tuentradaEventos: number;
 };
 
 /**
@@ -91,6 +93,7 @@ export const TOPES: Topes = {
   ticketekArtistas: 40,
   ticketekShows: 120,
   livepassEventos: 150,
+  tuentradaEventos: 90,
 };
 
 // Peor caso de fetches a la fuente, con todos los topes llenos.
@@ -111,6 +114,9 @@ export function fetchesMaximos(source: IngestSource, topes: Topes): number {
     // El listado más una página por evento nuevo.
     case "livepass":
       return 1 + topes.livepassEventos;
+    // La home —que es el listado real— más una página por evento nuevo.
+    case "tuentrada":
+      return 1 + topes.tuentradaEventos;
   }
 }
 

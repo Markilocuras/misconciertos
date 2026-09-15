@@ -7,6 +7,8 @@ import {
   normalizeDate,
   parseAllEventsListing,
   parseDalePlayLive,
+  parseTuEntradaEventLinks,
+  parseTuEntradaEventPage,
   parseTicketekMusicList,
   parseLivePassEventLinks,
   parseLivePassEventPage,
@@ -498,5 +500,123 @@ describe("helpers", () => {
   it("slugify saca acentos y colapsa lo que no sea alfanumérico", () => {
     expect(slugify("Teatro Ópera")).toBe("teatro-opera");
     expect(slugify("  Niceto  Club!  ")).toBe("niceto-club");
+  });
+});
+
+// Tu Entrada es Ticketmaster Argentina: la que vende Luna Park, el Gran Rex y
+// el Colón, que hasta que entró esta fuente no tenían un solo show en el mapa.
+describe("parseTuEntradaEventLinks", () => {
+  const links = parseTuEntradaEventLinks(fixture("tuentrada-home.html"));
+
+  it("saca los links de evento de la home", () => {
+    // El listado real es la home: /busqueda?categoria=música devuelve seis
+    // destacados fijos y no pagina, le pases lo que le pases.
+    expect(links.length).toBeGreaterThan(30);
+    expect(links).toContain("https://www.tuentrada.com/conociendo-rusia-tgr");
+  });
+
+  it("devuelve urls absolutas y sin repetir", () => {
+    for (const l of links) expect(l).toMatch(/^https:\/\/www\.tuentrada\.com\/[^/]+$/);
+    expect(new Set(links).size).toBe(links.length);
+  });
+
+  it("no se trae la navegación del sitio", () => {
+    for (const l of links) {
+      expect(l).not.toContain("busqueda");
+      expect(l).not.toContain("favicon");
+      expect(l).not.toContain("_next");
+    }
+  });
+});
+
+describe("parseTuEntradaEventPage", () => {
+  const caba = parseTuEntradaEventPage(
+    fixture("tuentrada-evento-caba.html"),
+    "https://www.tuentrada.com/conociendo-rusia-tgr",
+  );
+  const interior = parseTuEntradaEventPage(
+    fixture("tuentrada-evento-interior.html"),
+    "https://www.tuentrada.com/maza-amuedo-tandil",
+  );
+
+  it("saca el evento de la ficha", () => {
+    expect(caba).toMatchObject({
+      title: "CONOCIENDO RUSIA",
+      venue: "Teatro Gran Rex",
+      date: "2026-09-25",
+      time: "20:30",
+    });
+  });
+
+  // Tu Entrada mete un widget de stay22 —un mapa de hoteles cerca del show— y
+  // ahí publica, sin querer, la coordenada del venue. Vale lo mismo que la de
+  // Live Pass: entra al mapa sin depender de que alguien cargue el lugar.
+  it("le saca la coordenada al embed de stay22", () => {
+    expect(caba?.lat).toBeCloseTo(-34.6032, 3);
+    expect(caba?.lng).toBeCloseTo(-58.3788, 3);
+    // Y que sea la del venue de verdad: el Gran Rex está en Corrientes 857.
+    expect(interior?.lat).toBeCloseTo(-37.3281, 3);
+  });
+
+  // El caso que casi se cuela: la ficha de Tandil dice "Miércoles 16 de
+  // Septiembre" y el checkin del embed dice 2026-09-17, que cae jueves. Gana la
+  // visible, que trae el día de la semana y se valida sola.
+  it("prefiere la fecha visible al checkin cuando no coinciden", () => {
+    expect(interior?.date).toBe("2026-09-16");
+    expect(new Date("2026-09-16T12:00:00Z").getUTCDay()).toBe(3); // miércoles
+  });
+
+  it("saca la ciudad del subtítulo cuando el show es del interior", () => {
+    expect(interior?.locality).toBe("Tandil");
+    // En los de Buenos Aires ese subtítulo no existe, y la ausencia no dice
+    // nada: queda null, que para el filtro de provincia es "no sé".
+    expect(caba?.locality).toBeNull();
+  });
+
+  it("agarra la foto del show y no el logo del navbar", () => {
+    expect(caba?.image_url).toContain("/bucket/events/");
+    expect(caba?.image_url).not.toContain("navbar");
+    expect(interior?.image_url).not.toBe(caba?.image_url);
+  });
+
+  // Entre los links de la home hay páginas de venue, y no se distinguen por el
+  // slug. No hace falta: sin fecha no son un evento y se caen acá.
+  it("devuelve null con html que no es una ficha de evento", () => {
+    expect(parseTuEntradaEventPage(fixture("tuentrada-home.html"), "https://x")).toBeNull();
+    expect(parseTuEntradaEventPage("", "https://x")).toBeNull();
+  });
+});
+
+// La trampa de Tu Entrada: el widget de stay22 pone la coordenada del Obelisco,
+// con quince decimales e idéntica, en toda ficha cuyo venue no reconoce. Con
+// "Hipodromo De Tucuman" y "A Confirmar" la trae igual, así que tomarla en
+// serio manda shows de Tucumán al microcentro porteño — justo la clase de pin
+// mal puesto que obligó a auditar VENUE_COORDS contra OSM.
+describe("parseTuEntradaEventPage y la coordenada genérica", () => {
+  const conCoordenada = (lat: string, lng: string, venue: string) =>
+    `<h2 class="text-2xl">PRUEBA</h2>
+     <p class="text-blue-light"><span>Viernes 25 de Septiembre</span></p>
+     <span class="underline whitespace-nowrap">${venue}</span>
+     <iframe src="https://www.stay22.com/embed/gm?aid=x&amp;lat=${lat}&amp;lng=${lng}&amp;venue=${venue}&amp;checkin=2026-09-25"></iframe>`;
+
+  it("se queda con la coordenada cuando es de verdad", () => {
+    const ev = parseTuEntradaEventPage(
+      conCoordenada("-34.603210654064206", "-58.37885587483365", "Teatro Gran Rex"),
+      "https://www.tuentrada.com/x",
+    );
+    expect(ev?.lat).toBeCloseTo(-34.6032, 4);
+  });
+
+  it("descarta la genérica, para que no le invente un pin al venue desconocido", () => {
+    const ev = parseTuEntradaEventPage(
+      conCoordenada("-34.60369786376767", "-58.38160363203237", "Hipodromo De Tucuman"),
+      "https://www.tuentrada.com/x",
+    );
+    // Sin coordenada propia la fila cae a VENUE_COORDS, y si el lugar tampoco
+    // está ahí se descarta y el nombre queda en unknownVenues. Eso es lo
+    // correcto: mejor perder el show que ponerlo a 1000 km.
+    expect(ev?.lat).toBeNull();
+    expect(ev?.lng).toBeNull();
+    expect(ev?.venue).toBe("Hipodromo De Tucuman");
   });
 });

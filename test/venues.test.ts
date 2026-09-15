@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { VENUE_COORDS, findVenueCoords, isKnownVenue, normalizeVenueName } from "@/lib/venues";
+import {
+  VENUE_COORDS,
+  estaEnBuenosAires,
+  findVenueCoords,
+  isKnownVenue,
+  normalizeVenueName,
+} from "@/lib/venues";
 
 // Un venue sin coordenadas se descarta en la ingesta, así que cada fallo de
 // matching acá es un recital que no llega al mapa. En agosto de 2026 eso estaba
@@ -101,6 +107,40 @@ describe("findVenueCoords", () => {
       expect(lat, nombre).toBeLessThan(-33.2);
       expect(lng, nombre).toBeGreaterThan(-63.4);
       expect(lng, nombre).toBeLessThan(-56.6);
+    }
+  });
+});
+
+// Última red antes del mapa: la coordenada que publica una fuente no siempre es
+// de acá. Tu Entrada trae la del Anfiteatro Municipal de Rosario —real, bien
+// puesta, y en Santa Fe— y el filtro por ciudad no la agarra porque esa ficha
+// no dice de qué ciudad es.
+describe("estaEnBuenosAires", () => {
+  it("acepta la provincia entera, no solo el conurbano", () => {
+    expect(estaEnBuenosAires(-34.6037, -58.3816)).toBe(true); // Obelisco
+    expect(estaEnBuenosAires(-34.9213, -57.9545)).toBe(true); // La Plata
+    expect(estaEnBuenosAires(-37.3217, -59.1332)).toBe(true); // Tandil
+    expect(estaEnBuenosAires(-38.7183, -62.2661)).toBe(true); // Bahía Blanca
+    expect(estaEnBuenosAires(-34.5836, -60.9433)).toBe(true); // Junín
+    expect(estaEnBuenosAires(-38.0055, -57.5426)).toBe(true); // Mar del Plata
+  });
+
+  it("rechaza lo de otras provincias", () => {
+    expect(estaEnBuenosAires(-32.9468, -60.6393)).toBe(false); // Rosario
+    expect(estaEnBuenosAires(-31.4201, -64.1888)).toBe(false); // Córdoba
+    expect(estaEnBuenosAires(-32.8895, -68.8458)).toBe(false); // Mendoza
+    expect(estaEnBuenosAires(-26.8083, -65.2176)).toBe(false); // Tucumán
+    expect(estaEnBuenosAires(-38.9516, -68.0591)).toBe(false); // Neuquén
+  });
+
+  it("sin coordenada devuelve false, no se la juega", () => {
+    expect(estaEnBuenosAires(null, null)).toBe(false);
+    expect(estaEnBuenosAires(-34.6, null)).toBe(false);
+  });
+
+  it("toda la tabla cae adentro", () => {
+    for (const [nombre, { lat, lng }] of Object.entries(VENUE_COORDS)) {
+      expect(estaEnBuenosAires(lat, lng), nombre).toBe(true);
     }
   });
 });

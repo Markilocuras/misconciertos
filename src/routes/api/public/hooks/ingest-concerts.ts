@@ -4,7 +4,7 @@ import { todayInBuenosAires } from "@/lib/timezone";
 import { describeError } from "@/lib/describe-error";
 import { enTandas } from "@/lib/en-tandas";
 import { resolveSpotifyArtistIds } from "@/lib/spotify";
-import { findVenueCoords } from "@/lib/venues";
+import { estaEnBuenosAires, findVenueCoords } from "@/lib/venues";
 import {
   sendIngestAlert,
   sendNewConcertsDigest,
@@ -24,6 +24,9 @@ import {
   extractAllAccessEventLinks,
   parseAllAccessEventPage,
   parseDalePlayLive,
+  parseTuEntradaEventLinks,
+  parseTuEntradaEventPage,
+  TUENTRADA_HOME,
   parseTicketekMusicList,
   parseTicketekArtistShows,
   parseTicketekShow,
@@ -98,7 +101,13 @@ function toRow(source: string, externalId: string, ev: ScrapedEvent): ConcertRow
   // Si la fuente publica la coordenada (hoy solo Live Pass, en su JSON-LD), esa
   // manda: vale más que VENUE_COORDS porque no depende de que alguien haya
   // cargado el lugar a mano, y así entran salas que la tabla no conoce.
-  const propias = ev.lat != null && ev.lng != null ? { lat: ev.lat, lng: ev.lng } : null;
+  // La coordenada de la fuente solo vale si cae en la provincia. Sin este
+  // chequeo, Tu Entrada mete el Anfiteatro Municipal de Rosario —coordenada
+  // real, pero en Santa Fe— y el filtro por ciudad no lo agarra porque esa
+  // ficha no dice de que ciudad es.
+  const propias = estaEnBuenosAires(ev.lat ?? null, ev.lng ?? null)
+    ? { lat: ev.lat!, lng: ev.lng! }
+    : null;
   const coords = propias ?? findVenueCoords(ev.venue);
   return {
     source,
@@ -825,6 +834,72 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
           } catch (err) {
             console.error("[ingest-concerts] livepass failed", err);
             results["livepass"] = {
+              scraped: 0,
+              upserted: 0,
+              discarded: 0,
+              error: describeError(err),
+            };
+          }
+        }
+
+        // --- tuentrada.com (Ticketmaster Argentina) ---------------------------
+        //
+        // El listado es la home: /busqueda?categoria=música devuelve seis
+        // destacados fijos y no pagina. Entre sus links hay páginas de venue,
+        // que no se distinguen por el slug y se caen solas al parsear.
+        if (correr("tuentrada")) {
+          try {
+            const home = await fetchHtml(TUENTRADA_HOME);
+            const links = parseTuEntradaEventLinks(home);
+            const conocidos = new Set(
+              (existingRows ?? [])
+                .filter((r) => r.source === "tuentrada")
+                .map((r) => r.external_id.split("#")[0]),
+            );
+            const nuevos = links.filter((l) => !conocidos.has(l));
+            const toFetch = nuevos.slice(0, TOPES.tuentradaEventos);
+
+            // Vende en todo el país. La ficha dice la ciudad sólo cuando el
+            // show es del interior ("<em>en Tandil</em>"), así que la ausencia
+            // no significa nada y el filtro trata null como "no sé".
+            let fueraDeZona = 0;
+            const events = await enTandas(
+              toFetch,
+              async (link) => {
+                const ev = parseTuEntradaEventPage(await fetchHtml(link), link);
+                if (!ev) return null;
+                if (esDeOtraProvincia(ev.locality)) {
+                  fueraDeZona += 1;
+                  return null;
+                }
+                return ev;
+              },
+              (link, err) => console.error(`[ingest-concerts] tuentrada event ${link} failed`, err),
+            );
+            const skipped = links.length - toFetch.length + fueraDeZona;
+
+            if (debug) {
+              results["tuentrada"] = {
+                found: links.length,
+                scraped: events.length,
+                upserted: 0,
+                discarded: 0,
+                skipped,
+                fueraDeZona,
+                parsedSample: events.slice(0, 5),
+              };
+            } else {
+              const rows = events.map((ev) => toRow("tuentrada", `${ev.buy_url}#${ev.date}`, ev));
+              // Es ticketera: Dale Play linkea acá, así que sus buy_url tienen
+              // que estar en el cruce que evita el duplicado.
+              for (const ev of events) {
+                if (ev.buy_url) buyUrlsElsewhere.add(ev.buy_url);
+              }
+              await upsert("tuentrada", rows, events.length, skipped, links.length, fueraDeZona);
+            }
+          } catch (err) {
+            console.error("[ingest-concerts] tuentrada failed", err);
+            results["tuentrada"] = {
               scraped: 0,
               upserted: 0,
               discarded: 0,

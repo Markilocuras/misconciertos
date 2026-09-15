@@ -763,3 +763,182 @@ export function parseLivePassEventPage(html: string, pageUrl: string): ScrapedEv
     region: ev.location?.address?.addressRegion ?? null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// tuentrada.com — Ticketmaster Argentina, Next.js con App Router.
+//
+// Es la fuente que vende Luna Park, el Gran Rex y el Teatro Colón, que hasta
+// ahora no tenían un solo show en el mapa.
+//
+// El listado real es la home, no /busqueda?categoria=música: esa devuelve seis
+// destacados fijos y no pagina, mirá lo que mires. La home, en cambio, linkea
+// unos cincuenta eventos.
+//
+// Entre los links de la home también hay páginas de venue ("teatro-gran-rex").
+// No se pueden distinguir por el slug, así que entran igual y se caen solas al
+// parsear: una página de venue no tiene fecha. Con el techo de 1000
+// subrequests, gastar diez fetches en eso sale más barato que inventar una
+// heurística que un día se equivoque y descarte un evento.
+// ---------------------------------------------------------------------------
+
+export const TUENTRADA_HOME = "https://www.tuentrada.com/";
+
+// Lo que linkea la home y no es un evento. Va por prefijo porque son rutas
+// fijas del sitio, no contenido.
+const TUENTRADA_NO_EVENTOS = ["busqueda", "favicon", "_next", "ayuda", "login", "terminos"];
+
+export function parseTuEntradaEventLinks(html: string): string[] {
+  const links = new Set<string>();
+  for (const trozo of html.split('href="').slice(1)) {
+    const fin = trozo.indexOf('"');
+    if (fin < 0) continue;
+    const href = trozo.slice(0, fin).trim();
+    // Los eventos son slugs relativos y sin barra: "ntvg-gira". Todo lo que
+    // sea absoluto, ancla o ruta con barra es navegación del sitio.
+    if (!href || href.includes("/") || href.includes(":") || href.startsWith("#")) continue;
+    if (TUENTRADA_NO_EVENTOS.some((p) => href.startsWith(p))) continue;
+    links.add(`https://www.tuentrada.com/${href}`);
+  }
+  return [...links];
+}
+
+/**
+ * Saca un parámetro del embed de stay22 que Tu Entrada mete en cada ficha.
+ *
+ * Ese widget —un mapa de hoteles cerca del show— es, sin querer, la mejor
+ * fuente de datos de la página: publica la coordenada del venue, su nombre y
+ * la fecha en ISO. Vale más que el HTML visible, donde la fecha viene como
+ * "Viernes 25 de Septiembre", sin año, y hay que adivinarlo.
+ */
+function stay22Param(html: string, nombre: string): string | null {
+  // Los & del src vienen escapados como &amp;, así que el separador se acepta
+  // de las dos formas.
+  const re = new RegExp(`[?&](?:amp;)?${nombre}=([^&"']*)`);
+  const m = html.slice(html.indexOf("stay22.com/embed")).match(re);
+  if (!m) return null;
+  const valor = decodeHtmlEntities(decodeURIComponent(m[1].replace(/\+/g, " "))).trim();
+  return valor || null;
+}
+
+function numeroValido(raw: string | null): number | null {
+  if (!raw) return null;
+  const n = Number(raw);
+  return Number.isFinite(n) && n !== 0 ? n : null;
+}
+
+/**
+ * La coordenada que stay22 pone cuando no sabe dónde queda el venue.
+ *
+ * Es el Obelisco, con quince decimales, idéntica en todas las fichas que no
+ * reconoce. Y es una trampa: "Hipodromo De Tucuman" y "A Confirmar" la traen
+ * igual, así que tomarla en serio pondría un show de Tucumán en el microcentro
+ * porteño — exactamente la clase de pin mal puesto que obligó a auditar
+ * VENUE_COORDS contra OSM en agosto.
+ *
+ * Descartarla no pierde nada: sin coordenada propia la fila cae a
+ * VENUE_COORDS, y si el lugar tampoco está ahí, se descarta y el nombre queda
+ * anotado en `unknownVenues`, que es la lista de trabajo.
+ */
+const TUENTRADA_COORD_GENERICA = { lat: -34.60369786376767, lng: -58.38160363203237 };
+
+function coordenadaPropia(lat: number | null, lng: number | null) {
+  if (lat == null || lng == null) return { lat: null, lng: null };
+  const esGenerica =
+    Math.abs(lat - TUENTRADA_COORD_GENERICA.lat) < 1e-6 &&
+    Math.abs(lng - TUENTRADA_COORD_GENERICA.lng) < 1e-6;
+  return esGenerica ? { lat: null, lng: null } : { lat, lng };
+}
+
+const DIAS_SEMANA = ["domingo", "lunes", "martes", "miercoles", "jueves", "viernes", "sabado"];
+
+/**
+ * La fecha de una ficha de Tu Entrada, que publica dos y no siempre coinciden.
+ *
+ * La visible dice "Viernes 25 de Septiembre" —sin año— y el checkin del embed
+ * de stay22 dice "2026-09-25". Parecería que gana el checkin, que ya viene en
+ * ISO, pero miente: para el show de Tandil la ficha dice "Miércoles 16 de
+ * Septiembre" y el checkin dice 2026-09-17, que cae jueves. Un checkin de hotel
+ * no tiene por qué ser el día del show.
+ *
+ * Así que manda la visible, que además se valida sola: trae el día de la
+ * semana. El año sale de probar el del checkin y sus vecinos hasta que el día
+ * de la semana cierre — eso resuelve de paso el fin de año, cuando una ficha de
+ * diciembre anuncia un show de enero.
+ *
+ * Si no cierra con ninguno, cae al checkin: una fecha corrida un día es mucho
+ * mejor que perder el show.
+ */
+function fechaTuEntrada(html: string): string | null {
+  const checkin = normalizeDate(stay22Param(html, "checkin"));
+  const visible = html.match(
+    /text-blue-light[^>]*>\s*<span>\s*([a-záéíóúñ]+)\s+(\d{1,2})\s+de\s+([a-záéíóúñ]+)/i,
+  );
+  if (!visible) return checkin;
+
+  const diaSemana = sinAcentos(visible[1]).toLowerCase();
+  const dia = Number(visible[2]);
+  const mes = MONTHS[sinAcentos(visible[3]).toLowerCase()];
+  if (!mes || !dia) return checkin;
+
+  const anioBase = checkin ? Number(checkin.slice(0, 4)) : new Date().getUTCFullYear();
+  for (const anio of [anioBase, anioBase + 1, anioBase - 1]) {
+    const iso = toIsoDate(anio, mes, dia);
+    const cae = DIAS_SEMANA[new Date(`${iso}T12:00:00Z`).getUTCDay()];
+    if (cae === diaSemana) return iso;
+  }
+  return checkin;
+}
+
+export function parseTuEntradaEventPage(html: string, pageUrl: string): ScrapedEvent | null {
+  const tituloMatch = html.match(/<h2 class="text-2xl[^"]*"[^>]*>([^<]+)</);
+  const title = tituloMatch ? decodeHtmlEntities(tituloMatch[1]).trim() : "";
+  if (!title) return null;
+
+  // Sin fecha no hay evento: una página de venue llega hasta acá y se cae
+  // justo en este punto, que es lo que las filtra sin tener que adivinar por
+  // el slug cuál link de la home es un show y cuál no.
+  const date = fechaTuEntrada(html);
+  if (!date) return null;
+
+  const horaMatch = html.match(/Horario:\s*(?:<!--\s*-->)?\s*(\d{1,2}:\d{2})/);
+  const time = horaMatch ? horaMatch[1].padStart(5, "0") : null;
+
+  // El venue del embed es el que usa el mapa; el del HTML es el mismo texto
+  // pero puede venir cortado por el layout.
+  const venueHtml = html.match(/whitespace-nowrap">([^<]+)</);
+  const venue =
+    stay22Param(html, "venue") ?? (venueHtml ? decodeHtmlEntities(venueHtml[1]).trim() : null);
+
+  // Cuando el show es del interior, la ficha lo dice en un subtítulo:
+  // "<h3 ...><em>en Tandil</em></h3>". En los de Buenos Aires no aparece, así
+  // que la ausencia no significa nada y la locality queda en null: el filtro
+  // de provincia trata null como "no sé", que es lo correcto.
+  const ciudadMatch = html.match(/<h3[^>]*>\s*<em>\s*en\s+([^<]+?)\s*<\/em>/i);
+  const locality = ciudadMatch ? decodeHtmlEntities(ciudadMatch[1]).trim() : null;
+
+  // La imagen del show vive bajo /bucket/events/ o /bucket/event-groups/. Sin
+  // acotarlo a eso, el primer <img> de bucket.tuentrada.com que aparece es el
+  // logo del navbar, y todas las fichas terminaban con la misma foto.
+  const imagenMatch = html.match(
+    /src="(https:\/\/bucket\.tuentrada\.com[^"]*\/bucket\/event[^"]+)"/,
+  );
+
+  return {
+    title,
+    artist: deriveArtist(title) ?? title,
+    venue,
+    date,
+    time,
+    price: null,
+    // Como Ticketek: fabricar "Concierto en {venue}." deja todas las fichas
+    // del mismo lugar diciendo lo mismo. El texto se compone al renderizar.
+    description: null,
+    image_url: imagenMatch ? safeHttpUrl(imagenMatch[1]) : null,
+    buy_url: safeHttpUrl(pageUrl),
+    locality,
+    ...coordenadaPropia(
+      numeroValido(stay22Param(html, "lat")),
+      numeroValido(stay22Param(html, "lng")),
+    ),
+  };
+}
