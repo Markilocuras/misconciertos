@@ -114,9 +114,10 @@ export function fetchesMaximos(source: IngestSource, topes: Topes): number {
     // El listado más una página por evento nuevo.
     case "livepass":
       return 1 + topes.livepassEventos;
-    // La home —que es el listado real— más una página por evento nuevo.
+    // La home —que es el listado real—, los cuatro listados de categorias que
+    // se usan como lista de exclusion, y una pagina por evento nuevo.
     case "tuentrada":
-      return 1 + topes.tuentradaEventos;
+      return 1 + 4 + topes.tuentradaEventos;
   }
 }
 

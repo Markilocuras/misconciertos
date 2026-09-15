@@ -29,6 +29,8 @@ import {
   parseTuEntradaEventLinks,
   parseTuEntradaEventPage,
   TUENTRADA_HOME,
+  TUENTRADA_CATEGORIAS_NO_MUSICALES,
+  tuEntradaCategoriaUrl,
   parseTicketekMusicList,
   parseTicketekArtistShows,
   parseTicketekShow,
@@ -909,13 +911,38 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
                 .filter((r) => r.source === "tuentrada")
                 .map((r) => r.external_id.split("#")[0]),
             );
-            const nuevos = links.filter((l) => !conocidos.has(l));
+            // Tu Entrada no vende solo música: se colaron la Copa Libertadores
+            // y dos visitas guiadas a museos. El sitio sí clasifica sus
+            // eventos, pero la ficha no dice a qué categoría pertenece, así que
+            // se usa al revés: se piden los listados de las categorías que NO
+            // son música y sus slugs se excluyen. Es una lista de exclusión que
+            // arma el propio sitio, mucho más confiable que leerle el título —
+            // ningún evento musical aparece en una de esas categorías.
+            //
+            // Van antes del tope y de los fetches de ficha: lo que se excluye
+            // acá no gasta un fetch.
+            const noMusicalesPorCategoria = new Set<string>();
+            for (const categoria of TUENTRADA_CATEGORIAS_NO_MUSICALES) {
+              try {
+                const listado = await fetchHtml(tuEntradaCategoriaUrl(categoria));
+                for (const l of parseTuEntradaEventLinks(listado)) noMusicalesPorCategoria.add(l);
+              } catch (err) {
+                // Que falle un listado no puede voltear la fuente: sin él
+                // quedan las otras dos redes, el título y la lista de slugs.
+                console.error(`[ingest-concerts] tuentrada categoria ${categoria} failed`, err);
+              }
+            }
+
+            const nuevos = links.filter(
+              (l) => !conocidos.has(l) && !noMusicalesPorCategoria.has(l) && !esSlugBloqueado(l),
+            );
             const toFetch = nuevos.slice(0, TOPES.tuentradaEventos);
 
             // Vende en todo el país. La ficha dice la ciudad sólo cuando el
             // show es del interior ("<em>en Tandil</em>"), así que la ausencia
             // no significa nada y el filtro trata null como "no sé".
             let fueraDeZona = 0;
+            let noMusicales = 0;
             const events = await enTandas(
               toFetch,
               async (link) => {
@@ -925,11 +952,17 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
                   fueraDeZona += 1;
                   return null;
                 }
+                // Tercera red, para lo que no cayó en una categoría publicada y
+                // sí se delata por el título ("VISITA GUIADA AMIA").
+                if (pareceNoMusical(ev.title)) {
+                  noMusicales += 1;
+                  return null;
+                }
                 return ev;
               },
               (link, err) => console.error(`[ingest-concerts] tuentrada event ${link} failed`, err),
             );
-            const skipped = links.length - toFetch.length + fueraDeZona;
+            const skipped = links.length - toFetch.length + fueraDeZona + noMusicales;
 
             if (debug) {
               results["tuentrada"] = {
