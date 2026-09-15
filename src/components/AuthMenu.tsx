@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BarChart3, LogOut, User as UserIcon } from "lucide-react";
+import { BarChart3, LogOut, User as UserIcon, ShieldQuestion } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,11 +67,26 @@ export function AuthMenu({ className, compact }: AuthMenuProps = {}) {
           </span>
         </Link>
         {isAdmin && (
-          <Button asChild size="sm" variant="ghost" className="h-7 px-2" title="Estadísticas">
-            <Link to="/admin/stats">
-              <BarChart3 className="h-3.5 w-3.5" />
-            </Link>
-          </Button>
+          <>
+            <Button asChild size="sm" variant="ghost" className="h-7 px-2" title="Estadísticas">
+              <Link to="/admin/stats">
+                <BarChart3 className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+            {/* Sin este acceso la cola de revisión no existe para nadie: es una
+                página que solo se llega escribiendo la URL. */}
+            <Button
+              asChild
+              size="sm"
+              variant="ghost"
+              className="h-7 px-2"
+              title="Revisión de dudosos"
+            >
+              <Link to="/admin/revision">
+                <ShieldQuestion className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+          </>
         )}
         <Button
           size="sm"

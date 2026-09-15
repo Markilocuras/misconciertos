@@ -141,6 +141,7 @@ export type Database = {
           lat: number | null
           lng: number | null
           price: string | null
+          review_status: string | null
           slug: string | null
           source: string
           spotify_artist_id: string | null
@@ -163,6 +164,7 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           price?: string | null
+          review_status?: string | null
           slug?: string | null
           source: string
           spotify_artist_id?: string | null
@@ -185,6 +187,7 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           price?: string | null
+          review_status?: string | null
           slug?: string | null
           source?: string
           spotify_artist_id?: string | null

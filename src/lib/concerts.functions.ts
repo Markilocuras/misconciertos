@@ -44,6 +44,16 @@ const LINK_COLUMNS = "id, slug, title, artist, venue, date, time, image_url";
 
 const RELATED_LIMIT = 6;
 
+// Lo que se muestra al publico. NULL es lo normal —nadie sospecho de esa fila—
+// y "aprobado" es una persona que la miro y la dejo pasar. Lo que queda afuera
+// es "pendiente" (la ingesta sospecho y espera revision) y "rechazado" (una
+// persona dijo que no).
+//
+// Rechazado se queda en la base a proposito: la ingesta arma su lista de
+// conocidos leyendo la tabla, asi que borrar la fila la haria volver en la
+// corrida siguiente. Con el estado, rechazar aguanta solo.
+const VISIBLES = "review_status.is.null,review_status.eq.aprobado";
+
 function anonClient() {
   return createClient<Database>(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!, {
     auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
@@ -61,6 +71,7 @@ export async function fetchUpcomingConcertRows(): Promise<{
     .select(SELECT_COLUMNS)
     .gte("date", today)
     .neq("source", "seed")
+    .or(VISIBLES)
     .order("date", { ascending: true });
 
   if (error) {
@@ -90,6 +101,7 @@ async function fetchRelatedConcerts(concert: ConcertRow): Promise<ConcertLinkRow
       .select(LINK_COLUMNS)
       .gte("date", today)
       .neq("source", "seed")
+      .or(VISIBLES)
       .neq("id", concert.id)
       .not("slug", "is", null)
       .order("date", { ascending: true });
@@ -132,6 +144,7 @@ async function fetchRun(concert: ConcertRow): Promise<ConcertRow[]> {
     .eq("venue", concert.venue)
     .gte("date", today)
     .neq("source", "seed")
+    .or(VISIBLES)
     .not("slug", "is", null)
     .order("date", { ascending: true });
 
@@ -154,10 +167,14 @@ export const getConcertBySlug = createServerFn({ method: "GET" })
     return slug;
   })
   .handler(async ({ data: slug }) => {
+    // También acá: una fila pendiente o rechazada no tiene página pública. Sin
+    // esto el pin no saldría en el mapa pero el link seguiría funcionando, y el
+    // sitemap ya lo publicó alguna vez.
     const { data, error } = await anonClient()
       .from("concerts")
       .select(SELECT_COLUMNS)
       .eq("slug", slug)
+      .or(VISIBLES)
       .maybeSingle();
 
     if (error) {
