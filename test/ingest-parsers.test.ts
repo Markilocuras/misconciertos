@@ -8,6 +8,8 @@ import {
   parseAllEventsListing,
   parseDalePlayLive,
   parseTuEntradaEventLinks,
+  TUENTRADA_CATEGORIAS_NO_MUSICALES,
+  tuEntradaCategoriaUrl,
   parseTuEntradaEventPage,
   parseTicketekMusicList,
   parseLivePassEventLinks,
@@ -618,5 +620,56 @@ describe("parseTuEntradaEventPage y la coordenada genérica", () => {
     expect(ev?.lat).toBeNull();
     expect(ev?.lng).toBeNull();
     expect(ev?.venue).toBe("Hipodromo De Tucuman");
+  });
+});
+
+// Tu Entrada tampoco vende solo musica: se colaron al mapa la Copa Libertadores
+// en Vicente Lopez y dos visitas guiadas, una a la AMIA y otra al Museo del
+// Agua. Son tres redes distintas porque ninguna sola alcanza.
+describe("lo no musical de Tu Entrada", () => {
+  it("la categoria del sitio es la red principal", () => {
+    // El sitio clasifica sus eventos aunque la ficha no lo diga: se piden los
+    // listados de lo que NO es musica y sus slugs se excluyen.
+    expect(TUENTRADA_CATEGORIAS_NO_MUSICALES).toContain("deportes");
+    expect(TUENTRADA_CATEGORIAS_NO_MUSICALES).toContain("cultura");
+    expect(TUENTRADA_CATEGORIAS_NO_MUSICALES).not.toContain("musica");
+    expect(TUENTRADA_CATEGORIAS_NO_MUSICALES).not.toContain("música");
+  });
+
+  it("arma bien la url del listado, con el acento encodeado", () => {
+    expect(tuEntradaCategoriaUrl("deportes")).toBe(
+      "https://www.tuentrada.com/busqueda?categoria=deportes",
+    );
+    expect(tuEntradaCategoriaUrl("música")).toContain("m%C3%BAsica");
+  });
+
+  it("el titulo agarra las visitas guiadas", () => {
+    expect(pareceNoMusical("VISITA GUIADA AMIA")).toBe(true);
+    // Pero "museo" a secas no entra en la lista: un recital en el Museo de Arte
+    // Moderno lo dice igual en el titulo y seria un falso positivo, que cuesta
+    // un recital que no llega al mapa.
+    expect(pareceNoMusical("Ciclo de jazz en el Museo de Arte Moderno")).toBe(false);
+  });
+
+  it("el titulo agarra el futbol", () => {
+    // Entro "CONMEBOL Libertadores 2026" en el estadio de Platense. Lo agarra
+    // "conmebol", que es inequivoco; "libertadores" a secas no esta en la lista
+    // porque puede ser el nombre de una gira.
+    expect(pareceNoMusical("CONMEBOL Libertadores 2026")).toBe(true);
+    expect(pareceNoMusical("Libertadores Tour 2026")).toBe(false);
+  });
+
+  it("los slugs tapan lo que no se delata de ninguna forma", () => {
+    // "Midachi" y "Hablando Huevadas" son humor y "VISITA EL MUSEO DEL AGUA" no
+    // usa las palabras del colador. Ninguno cae en una categoria publicada.
+    for (const slug of ["midachi-tgr", "hablando-huevadas", "museodelagua"]) {
+      expect(esSlugBloqueado(`https://www.tuentrada.com/${slug}`), slug).toBe(true);
+    }
+  });
+
+  it("no bloquea recitales de verdad", () => {
+    for (const slug of ["conociendo-rusia-tgr", "abel-pintos-tgr", "djavan-tgr", "bandana-tgr"]) {
+      expect(esSlugBloqueado(`https://www.tuentrada.com/${slug}`), slug).toBe(false);
+    }
   });
 });

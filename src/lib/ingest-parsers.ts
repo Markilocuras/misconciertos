@@ -677,6 +677,15 @@ const TERMINOS_NO_MUSICALES = [
   "obra de teatro",
   "teatro leido",
   "programas de",
+  // Tu Entrada vende visitas guiadas a museos y edificios. Se nombran solas,
+  // asi que el colador las agarra. "museo" a secas no entra: un recital en el
+  // Museo de Arte Moderno lo dice igual en el titulo y seria un falso positivo.
+  "visita guiada",
+  // Tu Entrada tambien vende futbol: entro "CONMEBOL Libertadores 2026" en el
+  // estadio de Platense. "conmebol" es inequivoco; "libertadores" a secas no,
+  // porque puede ser el nombre de una gira o un tema.
+  "conmebol",
+  "copa libertadores",
 ];
 
 /**
@@ -701,6 +710,12 @@ const SLUGS_NO_MUSICALES = [
   "autos-robados",
   "inaki-urlezaga",
   "hecatombe-mi-primera-guerra-mundial",
+  // De Tu Entrada. Ninguno de los tres se delata por el titulo ni cae en una
+  // categoria que el sitio publique: "Midachi" y "Hablando Huevadas" son humor,
+  // y "VISITA EL MUSEO DEL AGUA" es una visita guiada que no usa esas palabras.
+  "midachi",
+  "hablando-huevadas",
+  "museodelagua",
 ];
 
 export function esSlugBloqueado(url: string): boolean {
@@ -782,6 +797,30 @@ export function parseLivePassEventPage(html: string, pageUrl: string): ScrapedEv
 // ---------------------------------------------------------------------------
 
 export const TUENTRADA_HOME = "https://www.tuentrada.com/";
+
+/**
+ * Las categorias de Tu Entrada que no son musica.
+ *
+ * El sitio clasifica sus eventos —su buscador filtra por musica, deportes,
+ * teatro, familia y cultura— pero la ficha de cada evento no dice a cual
+ * pertenece: las categorias que aparecen en el HTML son el menu de navegacion,
+ * identico en todas las paginas.
+ *
+ * Asi que se usa al reves: se piden los listados de las categorias que NO son
+ * musica y sus slugs se excluyen. Lo bueno es que la clasificacion la hace el
+ * propio sitio, asi que no tiene falsos positivos: ningun evento musical
+ * aparece en una de estas.
+ *
+ * Lo que NO es: un indice completo. Cada listado devuelve unos pocos
+ * destacados y rotan — la Copa Libertadores figuraba en "deportes" un dia y al
+ * siguiente ya no. Asi que es la red mas barata, no la mas confiable, y por eso
+ * detras siguen pareceNoMusical y SLUGS_NO_MUSICALES.
+ */
+export const TUENTRADA_CATEGORIAS_NO_MUSICALES = ["deportes", "teatro", "familia", "cultura"];
+
+export function tuEntradaCategoriaUrl(categoria: string): string {
+  return `https://www.tuentrada.com/busqueda?categoria=${encodeURIComponent(categoria)}`;
+}
 
 // Lo que linkea la home y no es un evento. Va por prefijo porque son rutas
 // fijas del sitio, no contenido.
