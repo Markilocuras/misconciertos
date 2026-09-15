@@ -302,3 +302,110 @@ export async function sendIngestAlert(
     return { sent: false, error: describeError(err) };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Avisos por artista
+//
+// La ficha de cada artista ofrece "te vamos a avisar cuando {artista} anuncie
+// un show nuevo". Durante meses eso no lo cumplió nadie: la gente se anotaba en
+// artist_alerts y esa tabla no la leía ni una línea de código.
+//
+// Se manda un mail por persona, no uno por artista: alguien anotado en tres
+// artistas que anuncian el mismo día recibe uno solo. El link de baja es por
+// suscripción —artista + mail—, así que darse de baja de uno no te saca de los
+// otros, que es lo que uno espera al anotarse por separado.
+// ---------------------------------------------------------------------------
+
+export type AlertaDeArtista = {
+  email: string;
+  unsubscribe_token: string;
+  /** Qué artista disparó cada concierto, para poder decirlo en el mail. */
+  conciertos: Array<{ artista: string; concierto: DigestConcert }>;
+};
+
+export type AlertasResult = { sent: number; failed: number; error?: string };
+
+function asuntoAlerta(a: AlertaDeArtista): string {
+  const artistas = [...new Set(a.conciertos.map((c) => c.artista))];
+  if (artistas.length === 1) return `${artistas[0]} anunció un show`;
+  return `${artistas.length} artistas que seguís anunciaron shows`;
+}
+
+function alertaHtmlArtista(a: AlertaDeArtista, unsubscribeUrl: string): string {
+  const filas = a.conciertos
+    .map(({ artista, concierto }) => {
+      const { title, detail, url } = concertLine(concierto);
+      return `<li style="margin-bottom:12px">
+        <a href="${escapeHtml(url)}" style="color:#c2410c;font-weight:600;text-decoration:none">${escapeHtml(title)}</a>
+        ${detail ? `<div style="color:#666;font-size:14px">${escapeHtml(detail)}</div>` : ""}
+        <div style="color:#999;font-size:12px">Te anotaste para que te avisemos de ${escapeHtml(artista)}</div>
+      </li>`;
+    })
+    .join("");
+
+  return `<div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;color:#1a1a24">
+    <h2 style="font-size:18px;margin:0 0 16px">${escapeHtml(asuntoAlerta(a))}</h2>
+    <ul style="font-size:15px;padding-left:20px;margin:0 0 20px">${filas}</ul>
+    <p style="font-size:13px;color:#888">
+      <a href="${escapeHtml(unsubscribeUrl)}" style="color:#888">Darme de baja de este aviso</a>
+    </p>
+  </div>`;
+}
+
+function alertaTextoArtista(a: AlertaDeArtista, unsubscribeUrl: string): string {
+  const filas = a.conciertos.map(({ artista, concierto }) => {
+    const { title, detail, url } = concertLine(concierto);
+    return `- ${title}${detail ? ` (${detail})` : ""}\n  ${url}\n  te anotaste por ${artista}`;
+  });
+  return [asuntoAlerta(a), "", ...filas, "", `Para darte de baja: ${unsubscribeUrl}`].join("\n");
+}
+
+// Nunca lanza, por el mismo motivo que el digest: se llama después de escribir
+// los conciertos y un problema con Resend no puede voltear una corrida.
+export async function sendArtistAlerts(
+  apiKey: string,
+  alertas: AlertaDeArtista[],
+): Promise<AlertasResult> {
+  if (alertas.length === 0) return { sent: 0, failed: 0 };
+
+  let sent = 0;
+  let failed = 0;
+  let firstError: string | undefined;
+
+  for (let i = 0; i < alertas.length; i += MAX_PER_BATCH) {
+    const chunk = alertas.slice(i, i + MAX_PER_BATCH);
+    const payload = chunk.map((a) => {
+      const unsubscribeUrl = `${SITE_URL}/baja?tipo=artista&token=${encodeURIComponent(a.unsubscribe_token)}`;
+      return {
+        from: FROM,
+        to: [a.email],
+        subject: asuntoAlerta(a),
+        html: alertaHtmlArtista(a, unsubscribeUrl),
+        text: alertaTextoArtista(a, unsubscribeUrl),
+        headers: { "List-Unsubscribe": `<${unsubscribeUrl}>` },
+      };
+    });
+
+    try {
+      const res = await fetch(RESEND_BATCH_ENDPOINT, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        failed += chunk.length;
+        const body = await res.text();
+        firstError ??= `resend ${res.status}: ${body.slice(0, 200)}`;
+        console.error("[email] alertas de artista fallaron", res.status, body.slice(0, 500));
+        continue;
+      }
+      sent += chunk.length;
+    } catch (err) {
+      failed += chunk.length;
+      firstError ??= describeError(err);
+      console.error("[email] alertas de artista tiraron", err);
+    }
+  }
+
+  return { sent, failed, ...(firstError ? { error: firstError } : {}) };
+}

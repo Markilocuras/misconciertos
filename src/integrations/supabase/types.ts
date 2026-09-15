@@ -20,18 +20,21 @@ export type Database = {
           created_at: string
           email: string
           id: string
+          unsubscribe_token: string
         }
         Insert: {
           artist: string
           created_at?: string
           email: string
           id?: string
+          unsubscribe_token?: string
         }
         Update: {
           artist?: string
           created_at?: string
           email?: string
           id?: string
+          unsubscribe_token?: string
         }
         Relationships: []
       }
@@ -305,6 +308,10 @@ export type Database = {
         Returns: { email: string; unsubscribe_token: string }[]
       }
       trigger_concert_ingest: { Args: never; Returns: undefined }
+      unsubscribe_artist_alert: {
+        Args: { token: string }
+        Returns: boolean
+      }
       unsubscribe_concert_digest: {
         Args: { token: string }
         Returns: boolean

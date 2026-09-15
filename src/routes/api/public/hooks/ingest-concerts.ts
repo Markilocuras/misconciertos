@@ -8,6 +8,8 @@ import { estaEnBuenosAires, findVenueCoords } from "@/lib/venues";
 import {
   sendIngestAlert,
   sendNewConcertsDigest,
+  sendArtistAlerts,
+  type AlertaDeArtista,
   type DigestConcert,
   type DigestRecipient,
   type FuenteCaida,
@@ -98,13 +100,14 @@ type ConcertRowInsert = {
 };
 
 function toRow(source: string, externalId: string, ev: ScrapedEvent): ConcertRowInsert {
-  // Si la fuente publica la coordenada (hoy solo Live Pass, en su JSON-LD), esa
-  // manda: vale más que VENUE_COORDS porque no depende de que alguien haya
-  // cargado el lugar a mano, y así entran salas que la tabla no conoce.
-  // La coordenada de la fuente solo vale si cae en la provincia. Sin este
-  // chequeo, Tu Entrada mete el Anfiteatro Municipal de Rosario —coordenada
-  // real, pero en Santa Fe— y el filtro por ciudad no lo agarra porque esa
-  // ficha no dice de que ciudad es.
+  // Si la fuente publica la coordenada (Live Pass en su JSON-LD, Tu Entrada en
+  // el embed de stay22), esa manda: vale más que VENUE_COORDS porque no depende
+  // de que alguien haya cargado el lugar a mano, y así entran salas que la
+  // tabla no conoce.
+  //
+  // Pero solo vale si cae en la provincia. Sin ese chequeo, Tu Entrada mete el
+  // Anfiteatro Municipal de Rosario —coordenada real, pero en Santa Fe— y el
+  // filtro por ciudad no lo agarra porque esa ficha no dice de qué ciudad es.
   const propias = estaEnBuenosAires(ev.lat ?? null, ev.lng ?? null)
     ? { lat: ev.lat!, lng: ev.lng! }
     : null;
@@ -356,13 +359,58 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
             (destinatarios ?? []) as DigestRecipient[],
           );
 
+          // Avisos por artista. Van en la misma invocación que el digest y no
+          // en una propia porque comparten la definición de "nuevo": los
+          // conciertos con digest_sent_at en NULL. Separarlos obligaría a
+          // llevar una segunda marca por suscripción para lo mismo.
+          //
+          // El match es por slug del artista: cada fuente lo escribe a su
+          // manera ("CONOCIENDO RUSIA", "Conociendo Rusia") y quien se anotó lo
+          // hizo desde la ficha de una de ellas.
+          const { data: suscripciones, error: alertasErr } = await supabaseAdmin
+            .from("artist_alerts")
+            .select("artist, email, unsubscribe_token");
+          if (alertasErr) console.error("[ingest-concerts] artist_alerts failed", alertasErr);
+
+          const porArtista = new Map<string, typeof suscripciones>();
+          for (const s of suscripciones ?? []) {
+            const clave = slugify(s.artist);
+            if (!porArtista.has(clave)) porArtista.set(clave, []);
+            porArtista.get(clave)!.push(s);
+          }
+
+          // Un mail por persona, no uno por artista: quien sigue a tres que
+          // anuncian el mismo día recibe uno solo.
+          const porMail = new Map<string, AlertaDeArtista>();
+          for (const c of nuevos) {
+            if (!c.artist) continue;
+            for (const s of porArtista.get(slugify(c.artist)) ?? []) {
+              const ya = porMail.get(s.email);
+              const item = { artista: s.artist, concierto: c as DigestConcert };
+              if (ya) ya.conciertos.push(item);
+              else
+                porMail.set(s.email, {
+                  email: s.email,
+                  unsubscribe_token: s.unsubscribe_token,
+                  conciertos: [item],
+                });
+            }
+          }
+
+          const alertas = await sendArtistAlerts(apiKey, [...porMail.values()]);
+
           // Se marcan solo si no falló ningún envío. Si Resend rechazó un lote,
           // esos conciertos quedan sin marcar y salen en el próximo digest;
           // preferimos un mail repetido antes que un show que no se avisó
           // nunca. Sin destinatarios también se marcan: no hay a quién avisarle,
           // y si no, el primero que se suscriba recibiría el acumulado entero.
+          //
+          // Los avisos por artista entran en la misma condición: si uno falló,
+          // esos conciertos quedan sin marcar y se reintenta todo en la próxima
+          // corrida. Cuesta un digest repetido, que es el precio que este
+          // proyecto ya eligió pagar antes que perder un aviso.
           let marcados = 0;
-          if (result.failed === 0) {
+          if (result.failed === 0 && alertas.failed === 0) {
             const { error: marcaErr } = await supabaseAdmin
               .from("concerts")
               .update({ digest_sent_at: new Date().toISOString() })
@@ -374,7 +422,12 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
             else marcados = nuevos.length;
           }
 
-          return responder({ new: nuevos.length, ...result, marcados });
+          return responder({
+            new: nuevos.length,
+            ...result,
+            marcados,
+            alertasDeArtista: { destinatarios: porMail.size, ...alertas },
+          });
         }
 
         // Qué fuentes corre esta invocación. El cron manda una por vez
