@@ -981,3 +981,52 @@ export function parseTuEntradaEventPage(html: string, pageUrl: string): ScrapedE
     ),
   };
 }
+
+/**
+ * Términos que hacen sospechar, sin alcanzar para descartar.
+ *
+ * Son los que deliberadamente NO están en TERMINOS_NO_MUSICALES, y por un buen
+ * motivo: ahí un falso positivo cuesta un recital que no llega al mapa. "Museo"
+ * descarta un ciclo de jazz en el Museo de Arte Moderno; "libertadores" puede
+ * ser el nombre de una gira; "teatro" es la mitad de los venues de la ciudad.
+ *
+ * Acá cuestan un clic, así que se puede sospechar tranquilo. Es el filtro que
+ * antes no se podía escribir.
+ */
+const TERMINOS_DUDOSOS = [
+  "museo",
+  "visita",
+  "libertadores",
+  "copa ",
+  "torneo",
+  "partido",
+  "expo",
+  "feria",
+  "congreso",
+  "charla",
+  "taller",
+  "monologo",
+  "comedia",
+  "humor",
+  "circo",
+  "magia",
+  "danza",
+  "cine",
+  "proyeccion",
+  "muestra",
+];
+
+/**
+ * Si el título da para sospechar que no es música.
+ *
+ * Distinto de `pareceNoMusical`, que descarta: esto solo manda a revisión. La
+ * diferencia importa — un término acá puede equivocarse sin costo, uno allá no.
+ *
+ * Lo que ya se descarta no se marca además como dudoso: sería ruido en la
+ * cola de revisión de cosas que ni siquiera entraron.
+ */
+export function pareceDudoso(title: string): boolean {
+  if (pareceNoMusical(title)) return false;
+  const t = sinAcentos(title).toLowerCase();
+  return TERMINOS_DUDOSOS.some((termino) => t.includes(termino));
+}

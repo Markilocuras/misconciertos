@@ -22,6 +22,7 @@ import {
   parseLivePassEventLinks,
   parseLivePassEventPage,
   pareceNoMusical,
+  pareceDudoso,
   esSlugBloqueado,
   extractAllAccessEventLinks,
   parseAllAccessEventPage,
@@ -170,6 +171,9 @@ type SourceReport = {
   // trabajo. Cuando no existía, esos shows se caían más adelante como "venue
   // sin coordenadas" y se mezclaban con los que de verdad hay que cargar.
   fueraDeZona?: number;
+  // Cuantas filas se mandaron a revision en vez de publicarse. Si esto sube de
+  // golpe, o el filtro se paso de sospechoso o la fuente cambio lo que vende.
+  dudosos?: number;
   // Desglose de `discarded`. Sin esto un venue que falta en VENUE_COORDS se cae
   // en silencio, que es como estuvimos perdiendo shows durante semanas sin
   // enterarnos: el contador subía pero no decía de qué.
@@ -315,11 +319,46 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
         // perderse, y el cron del digest no tiene que caer justo después del
         // scrapeo para ver lo que se acaba de escribir.
         if (url.searchParams.get("digest") === "1") {
+          // Repaso de sospechosos, antes de armar el mail.
+          //
+          // El marcado que hace `upsert` solo alcanza a lo que la corrida
+          // fetcheó, y una fuente solo abre lo que no conoce: una fila que ya
+          // estaba nunca vuelve a pasar por el filtro. Sin este repaso, ampliar
+          // la lista de términos no tendría efecto sobre nada de lo ya cargado
+          // —"Aniversario Copa Davis" seguiría en el mapa— y el feature solo
+          // serviría para el futuro.
+          //
+          // Va acá y no en su propia invocación porque es una consulta y un
+          // update, y porque tiene que correr antes de armar el digest: lo que
+          // queda pendiente no se publica, así que tampoco se avisa por mail.
+          let repasados = 0;
+          const { data: aRevisar } = await supabaseAdmin
+            .from("concerts")
+            .select("id, title")
+            .is("review_status", null)
+            .gte("date", today);
+          const sospechosos = (aRevisar ?? []).filter((c) => pareceDudoso(c.title));
+          if (sospechosos.length > 0) {
+            const { error: repErr } = await supabaseAdmin
+              .from("concerts")
+              .update({ review_status: "pendiente" })
+              .in(
+                "id",
+                sospechosos.map((c) => c.id),
+              )
+              .is("review_status", null);
+            if (repErr) console.error("[ingest-concerts] repaso de dudosos", repErr);
+            else repasados = sospechosos.length;
+          }
+
           const { data: sinAvisar, error: sinAvisarErr } = await supabaseAdmin
             .from("concerts")
             .select("id, title, artist, venue, date, time, slug")
             .is("digest_sent_at", null)
             .gte("date", today)
+            // Lo pendiente no está en el mapa: avisarlo por mail sería mandar a
+            // la gente a un link que no existe.
+            .or("review_status.is.null,review_status.eq.aprobado")
             .order("date", { ascending: true });
           if (sinAvisarErr) {
             return new Response(JSON.stringify({ error: sinAvisarErr.message }), {
@@ -335,7 +374,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
               headers: { "Content-Type": "application/json" },
             });
 
-          if (nuevos.length === 0) return responder({ new: 0, sent: 0, failed: 0 });
+          if (nuevos.length === 0) return responder({ new: 0, sent: 0, failed: 0, repasados });
 
           const apiKey = process.env.RESEND_API_KEY;
           if (!apiKey) {
@@ -428,6 +467,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
             new: nuevos.length,
             ...result,
             marcados,
+            repasados,
             alertasDeArtista: { destinatarios: porMail.size, ...alertas },
           });
         }
@@ -563,11 +603,34 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
           // cron spotify-backfill-daily (06:00 UTC) la completa.
           const kept = dedupeByExternalId(usable);
           assignSlugs(kept);
+          let dudosos = 0;
           if (kept.length > 0) {
             const { error } = await supabaseAdmin
               .from("concerts")
               .upsert(kept, { onConflict: "source,external_id" });
             if (error) throw error;
+
+            // Lo sospechoso se manda a revisión en vez de publicarse. Va en un
+            // UPDATE aparte y no en el upsert a propósito: el upsert pisa todas
+            // las columnas que le pasás, así que incluir review_status ahí le
+            // borraría a cada corrida lo que una persona ya decidió.
+            //
+            // El `is null` es esa misma garantía escrita: solo toca lo que
+            // nadie miró todavía.
+            const sospechosos = kept.filter((r) => pareceDudoso(r.title));
+            if (sospechosos.length > 0) {
+              const { error: revErr } = await supabaseAdmin
+                .from("concerts")
+                .update({ review_status: "pendiente" })
+                .eq("source", sourceKey)
+                .in(
+                  "external_id",
+                  sospechosos.map((r) => r.external_id),
+                )
+                .is("review_status", null);
+              if (revErr) console.error(`[ingest-concerts] ${sourceKey} marcar dudosos`, revErr);
+              else dudosos = sospechosos.length;
+            }
           }
           results[sourceKey] = {
             ...(found !== undefined ? { found } : {}),
@@ -576,6 +639,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
             discarded: scraped - kept.length,
             ...(skipped ? { skipped } : {}),
             ...(fueraDeZona ? { fueraDeZona } : {}),
+            ...(dudosos ? { dudosos } : {}),
             ...(Object.values(discardedBy).some((n) => n > 0) ? { discardedBy } : {}),
             ...(unknownVenues.size > 0 ? { unknownVenues: [...unknownVenues].sort() } : {}),
           };
