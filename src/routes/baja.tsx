@@ -4,8 +4,13 @@ import { BellOff, Map as MapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/baja")({
+  // `tipo=artista` llega desde los avisos por artista; sin él es el resumen de
+  // novedades, que es el único que existía cuando se escribió esta página. Son
+  // dos suscripciones distintas y se dan de baja por separado: quien se anotó a
+  // un artista puntual no pidió dejar de recibir el resumen, ni al revés.
   validateSearch: (search: Record<string, unknown>) => ({
     token: typeof search.token === "string" ? search.token : "",
+    tipo: search.tipo === "artista" ? ("artista" as const) : ("digest" as const),
   }),
   head: () => ({
     meta: [
@@ -17,13 +22,17 @@ export const Route = createFileRoute("/baja")({
 });
 
 function UnsubscribePage() {
-  const { token } = Route.useSearch();
+  const { token, tipo } = Route.useSearch();
   const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
 
   const confirm = async () => {
     setState("sending");
     try {
-      const res = await fetch("/api/public/hooks/unsubscribe-digest", {
+      const endpoint =
+        tipo === "artista"
+          ? "/api/public/hooks/unsubscribe-alert"
+          : "/api/public/hooks/unsubscribe-digest";
+      const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token }),

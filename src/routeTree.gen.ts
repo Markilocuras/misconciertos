@@ -23,6 +23,7 @@ import { Route as ConciertoSlugRouteImport } from './routes/concierto.$slug'
 import { Route as AuthenticatedPerfilRouteImport } from './routes/_authenticated/perfil'
 import { Route as AuthenticatedAdminStatsRouteImport } from './routes/_authenticated/admin.stats'
 import { Route as ApiPublicHooksUnsubscribeDigestRouteImport } from './routes/api/public/hooks/unsubscribe-digest'
+import { Route as ApiPublicHooksUnsubscribeAlertRouteImport } from './routes/api/public/hooks/unsubscribe-alert'
 import { Route as ApiPublicHooksTrackClickRouteImport } from './routes/api/public/hooks/track-click'
 import { Route as ApiPublicHooksIngestConcertsRouteImport } from './routes/api/public/hooks/ingest-concerts'
 
@@ -97,6 +98,12 @@ const ApiPublicHooksUnsubscribeDigestRoute =
     path: '/api/public/hooks/unsubscribe-digest',
     getParentRoute: () => rootRouteImport,
   } as any)
+const ApiPublicHooksUnsubscribeAlertRoute =
+  ApiPublicHooksUnsubscribeAlertRouteImport.update({
+    id: '/api/public/hooks/unsubscribe-alert',
+    path: '/api/public/hooks/unsubscribe-alert',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicHooksTrackClickRoute =
   ApiPublicHooksTrackClickRouteImport.update({
     id: '/api/public/hooks/track-click',
@@ -125,6 +132,7 @@ export interface FileRoutesByFullPath {
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
   '/api/public/hooks/track-click': typeof ApiPublicHooksTrackClickRoute
+  '/api/public/hooks/unsubscribe-alert': typeof ApiPublicHooksUnsubscribeAlertRoute
   '/api/public/hooks/unsubscribe-digest': typeof ApiPublicHooksUnsubscribeDigestRoute
 }
 export interface FileRoutesByTo {
@@ -142,6 +150,7 @@ export interface FileRoutesByTo {
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
   '/api/public/hooks/track-click': typeof ApiPublicHooksTrackClickRoute
+  '/api/public/hooks/unsubscribe-alert': typeof ApiPublicHooksUnsubscribeAlertRoute
   '/api/public/hooks/unsubscribe-digest': typeof ApiPublicHooksUnsubscribeDigestRoute
 }
 export interface FileRoutesById {
@@ -161,6 +170,7 @@ export interface FileRoutesById {
   '/_authenticated/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
   '/api/public/hooks/track-click': typeof ApiPublicHooksTrackClickRoute
+  '/api/public/hooks/unsubscribe-alert': typeof ApiPublicHooksUnsubscribeAlertRoute
   '/api/public/hooks/unsubscribe-digest': typeof ApiPublicHooksUnsubscribeDigestRoute
 }
 export interface FileRouteTypes {
@@ -180,6 +190,7 @@ export interface FileRouteTypes {
     | '/admin/stats'
     | '/api/public/hooks/ingest-concerts'
     | '/api/public/hooks/track-click'
+    | '/api/public/hooks/unsubscribe-alert'
     | '/api/public/hooks/unsubscribe-digest'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -197,6 +208,7 @@ export interface FileRouteTypes {
     | '/admin/stats'
     | '/api/public/hooks/ingest-concerts'
     | '/api/public/hooks/track-click'
+    | '/api/public/hooks/unsubscribe-alert'
     | '/api/public/hooks/unsubscribe-digest'
   id:
     | '__root__'
@@ -215,6 +227,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/stats'
     | '/api/public/hooks/ingest-concerts'
     | '/api/public/hooks/track-click'
+    | '/api/public/hooks/unsubscribe-alert'
     | '/api/public/hooks/unsubscribe-digest'
   fileRoutesById: FileRoutesById
 }
@@ -232,6 +245,7 @@ export interface RootRouteChildren {
   ConciertoSlugRoute: typeof ConciertoSlugRoute
   ApiPublicHooksIngestConcertsRoute: typeof ApiPublicHooksIngestConcertsRoute
   ApiPublicHooksTrackClickRoute: typeof ApiPublicHooksTrackClickRoute
+  ApiPublicHooksUnsubscribeAlertRoute: typeof ApiPublicHooksUnsubscribeAlertRoute
   ApiPublicHooksUnsubscribeDigestRoute: typeof ApiPublicHooksUnsubscribeDigestRoute
 }
 
@@ -335,6 +349,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksUnsubscribeDigestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/unsubscribe-alert': {
+      id: '/api/public/hooks/unsubscribe-alert'
+      path: '/api/public/hooks/unsubscribe-alert'
+      fullPath: '/api/public/hooks/unsubscribe-alert'
+      preLoaderRoute: typeof ApiPublicHooksUnsubscribeAlertRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/track-click': {
       id: '/api/public/hooks/track-click'
       path: '/api/public/hooks/track-click'
@@ -379,6 +400,7 @@ const rootRouteChildren: RootRouteChildren = {
   ConciertoSlugRoute: ConciertoSlugRoute,
   ApiPublicHooksIngestConcertsRoute: ApiPublicHooksIngestConcertsRoute,
   ApiPublicHooksTrackClickRoute: ApiPublicHooksTrackClickRoute,
+  ApiPublicHooksUnsubscribeAlertRoute: ApiPublicHooksUnsubscribeAlertRoute,
   ApiPublicHooksUnsubscribeDigestRoute: ApiPublicHooksUnsubscribeDigestRoute,
 }
 export const routeTree = rootRouteImport
