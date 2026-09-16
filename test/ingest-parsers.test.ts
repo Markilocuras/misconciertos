@@ -17,6 +17,7 @@ import {
   isBuenosAiresRegion,
   esDeOtraProvincia,
   pareceNoMusical,
+  pareceDudoso,
   esSlugBloqueado,
   slugify,
 } from "@/lib/ingest-parsers";
@@ -671,5 +672,45 @@ describe("lo no musical de Tu Entrada", () => {
     for (const slug of ["conociendo-rusia-tgr", "abel-pintos-tgr", "djavan-tgr", "bandana-tgr"]) {
       expect(esSlugBloqueado(`https://www.tuentrada.com/${slug}`), slug).toBe(false);
     }
+  });
+});
+
+// El tercer nivel: ni publicar ni descartar, sino mandar a revision. Existe
+// para poder sospechar de cosas que antes no convenia tocar — cuando el unico
+// resultado posible era descartar, un falso positivo costaba un recital.
+describe("pareceDudoso", () => {
+  it("sospecha de lo que antes se dejaba pasar por las dudas", () => {
+    for (const t of [
+      "VISITA EL MUSEO DEL AGUA",
+      "Libertadores Tour 2026",
+      "Expo Feria del Libro",
+      "Torneo de ajedrez",
+      "Noche de magia",
+    ]) {
+      expect(pareceDudoso(t), t).toBe(true);
+    }
+  });
+
+  it("no toca los recitales normales", () => {
+    for (const t of ["Abel Pintos", "CONOCIENDO RUSIA", "Filarmónica de Berlín", "Djavan"]) {
+      expect(pareceDudoso(t), t).toBe(false);
+    }
+  });
+
+  // Lo que ya se descarta no se marca ademas como dudoso: seria llenar la cola
+  // de revision con cosas que ni siquiera entraron.
+  it("no manda a revisar lo que ya se descarta", () => {
+    expect(pareceNoMusical("CONMEBOL Libertadores 2026")).toBe(true);
+    expect(pareceDudoso("CONMEBOL Libertadores 2026")).toBe(false);
+    expect(pareceNoMusical("VISITA GUIADA AMIA")).toBe(true);
+    expect(pareceDudoso("VISITA GUIADA AMIA")).toBe(false);
+  });
+
+  // El caso que justifica que exista este nivel: un recital de verdad que el
+  // filtro de descarte hubiera tirado. Ahora cuesta un clic, no un show.
+  it("un recital en un museo va a revision, no a la basura", () => {
+    const t = "Ciclo de jazz en el Museo de Arte Moderno";
+    expect(pareceNoMusical(t)).toBe(false);
+    expect(pareceDudoso(t)).toBe(true);
   });
 });
