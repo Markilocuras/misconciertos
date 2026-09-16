@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { todayInBuenosAires } from "@/lib/timezone";
 
 /**
  * La cola de revisión: lo que la ingesta marcó como dudoso y no publicó.
@@ -47,6 +48,10 @@ export const listPendingReview = createServerFn({ method: "GET" })
     const { data, error } = await supabaseAdmin
       .from("concerts")
       .select("id, title, artist, venue, date, source, buy_url")
+      // Solo lo que todavía se puede decidir. El mapa muestra futuro, así que
+      // un dudoso con fecha pasada no se publica ni aunque lo apruebes: dejarlo
+      // en la cola es pedir una decisión que ya no cambia nada.
+      .gte("date", todayInBuenosAires())
       .eq("review_status", "pendiente")
       .order("date", { ascending: true });
 
