@@ -6,6 +6,8 @@ import {
   TOPE_SUBREQUESTS,
   selectSources,
   subrequestsPeorCaso,
+  subrequestsPush,
+  suscripcionesPushQueEntran,
 } from "@/lib/ingest-sources";
 
 describe("selectSources", () => {
@@ -62,16 +64,16 @@ describe("presupuesto de subrequests", () => {
     }
   });
 
-  // Con 1000 no hace falta un juego de topes mas chico para el modo manual:
-  // las cinco juntas entran con los mismos numeros que una sola.
-  it("las cinco juntas tambien entran, con los mismos topes", () => {
+  // No hace falta un juego de topes mas chico para el modo manual: las seis
+  // juntas entran con los mismos numeros que una sola.
+  it("las seis juntas tambien entran, con los mismos topes", () => {
     expect(subrequestsPeorCaso(INGEST_SOURCES, TOPES)).toBeLessThanOrEqual(TOPE_SUBREQUESTS);
   });
 
-  // El techo subio de 50 a 1000 pero no desaparecio, y este es el test que lo
-  // recuerda. Con los topes de hoy el peor caso queda bien abajo: si alguien
-  // los sube hasta rozarlo, que sea con esto en rojo y no con una corrida que
-  // devuelve cero en silencio.
+  // El techo subio de 50 a 1000 y despues a 10.000, pero no desaparecio, y este
+  // es el test que lo recuerda. Con los topes de hoy el peor caso queda bien
+  // abajo: si alguien los sube hasta rozarlo, que sea con esto en rojo y no con
+  // una corrida que devuelve cero en silencio.
   it("deja margen de sobra, no entra raspando", () => {
     const peorCaso = subrequestsPeorCaso(INGEST_SOURCES, TOPES);
     expect(peorCaso).toBeLessThan(TOPE_SUBREQUESTS * 0.75);
@@ -84,5 +86,27 @@ describe("presupuesto de subrequests", () => {
     expect(TOPES.livepassEventos).toBeGreaterThanOrEqual(88);
     expect(TOPES.allaccessEventos).toBeGreaterThanOrEqual(25);
     expect(TOPES.ticketekArtistas + TOPES.ticketekShows).toBeGreaterThanOrEqual(63);
+  });
+});
+
+// Los avisos por push son el primer costo del proyecto que crece con la
+// cantidad de gente y no con la de fuentes: los push services no tienen envio
+// en lote como Resend, asi que va un POST por suscripcion. Por eso corren en su
+// propia invocacion, y por eso el numero que importa es cuantas entran.
+describe("presupuesto de los avisos por push", () => {
+  it("una invocacion vacia casi no gasta", () => {
+    expect(subrequestsPush(0)).toBeLessThanOrEqual(5);
+  });
+
+  it("cada suscripcion cuesta exactamente un subrequest", () => {
+    expect(subrequestsPush(100) - subrequestsPush(99)).toBe(1);
+  });
+
+  it("entran miles de suscripciones en una sola corrida", () => {
+    const entran = suscripcionesPushQueEntran();
+    expect(entran).toBeGreaterThan(9000);
+    expect(subrequestsPush(entran)).toBeLessThanOrEqual(TOPE_SUBREQUESTS);
+    // Una mas ya no entra: es el borde exacto, no una estimacion.
+    expect(subrequestsPush(entran + 1)).toBeGreaterThan(TOPE_SUBREQUESTS);
   });
 });
