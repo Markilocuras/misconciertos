@@ -11,6 +11,8 @@ import {
 import { getConcertBySlug, type ConcertLinkRow } from "@/lib/concerts.functions";
 import { ArtistComments } from "@/components/ArtistComments";
 import { ArtistAlert } from "@/components/ArtistAlert";
+import { ArtistPush } from "@/components/ArtistPush";
+import { ShowAlert } from "@/components/ShowAlert";
 import { AddToCalendar } from "@/components/AddToCalendar";
 import { BackToMap } from "@/components/BackToMap";
 import { SaveButton } from "@/components/SaveButton";
@@ -261,10 +263,12 @@ function ConcertPage() {
                 <SaveButton concertId={concert.id} />
               </div>
               <SpotifyButton concert={concert} />
+              <ShowAlert concert={concert} />
             </div>
 
             <RunDates run={run} current={concert} />
 
+            {concert.artist && <ArtistPush artist={concert.artist} />}
             {concert.artist && <ArtistAlert artist={concert.artist} />}
             {concert.artist && <ArtistComments artist={concert.artist} />}
           </div>

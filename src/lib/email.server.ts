@@ -409,3 +409,117 @@ export async function sendArtistAlerts(
 
   return { sent, failed, ...(firstError ? { error: firstError } : {}) };
 }
+
+// ---------------------------------------------------------------------------
+// Recordatorio de un show, el día anterior
+//
+// Es el fallback del botón "Avisame de este show" para quien no puede recibir
+// una notificación: adentro del webview de Instagram, con el permiso denegado,
+// o en un navegador sin soporte. Manda exactamente lo mismo que el push, por
+// el otro canal — si dijera otra cosa, el botón estaría prometiendo distinto
+// según dónde lo toquen.
+// ---------------------------------------------------------------------------
+
+export type RecordatorioMail = {
+  email: string;
+  unsubscribe_token: string;
+  conciertos: DigestConcert[];
+};
+
+function asuntoRecordatorio(r: RecordatorioMail): string {
+  if (r.conciertos.length === 1) {
+    const c = r.conciertos[0];
+    return `Mañana: ${c.artist || c.title}`;
+  }
+  return `Mañana tenés ${r.conciertos.length} shows`;
+}
+
+function recordatorioHtml(r: RecordatorioMail, unsubscribeUrl: string): string {
+  const filas = r.conciertos
+    .map((c) => {
+      const { title, detail, url } = concertLine(c);
+      return `<tr><td style="padding:12px 0;border-bottom:1px solid #e7e5e0">
+        <a href="${escapeHtml(url)}" style="color:#0e111b;font-size:16px;font-weight:600;text-decoration:none">${escapeHtml(title)}</a>
+        <div style="color:#6b6b76;font-size:14px;margin-top:4px">${escapeHtml(detail)}</div>
+      </td></tr>`;
+    })
+    .join("");
+
+  return `<!doctype html>
+<html lang="es"><body style="margin:0;padding:24px;background:#f5f4ef;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif">
+  <table role="presentation" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:28px">
+    <tr><td>
+      <p style="margin:0 0 4px;color:#ff9710;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase">misconciertos</p>
+      <h1 style="margin:0 0 20px;font-size:22px;color:#0e111b">${escapeHtml(asuntoRecordatorio(r))}</h1>
+      <table role="presentation" style="width:100%;border-collapse:collapse">${filas}</table>
+      <p style="margin:28px 0 0;color:#9a9aa5;font-size:12px;line-height:1.6">
+        Pediste que te recordáramos este show desde su página en misconciertos.<br>
+        <a href="${escapeHtml(unsubscribeUrl)}" style="color:#6b6b76">No quiero este recordatorio</a>
+      </p>
+    </td></tr>
+  </table>
+</body></html>`;
+}
+
+function recordatorioTexto(r: RecordatorioMail, unsubscribeUrl: string): string {
+  const lineas = r.conciertos.map((c) => {
+    const { title, detail, url } = concertLine(c);
+    return `- ${title}${detail ? ` (${detail})` : ""}\n  ${url}`;
+  });
+  return [
+    asuntoRecordatorio(r),
+    "",
+    ...lineas,
+    "",
+    `Para no recibir este recordatorio: ${unsubscribeUrl}`,
+  ].join("\n");
+}
+
+// No lanza, por el mismo motivo que los otros dos.
+export async function sendShowReminderEmails(
+  apiKey: string,
+  recordatorios: RecordatorioMail[],
+): Promise<DigestResult> {
+  if (recordatorios.length === 0) return { sent: 0, failed: 0 };
+
+  let sent = 0;
+  let failed = 0;
+  let firstError: string | undefined;
+
+  for (let i = 0; i < recordatorios.length; i += MAX_PER_BATCH) {
+    const chunk = recordatorios.slice(i, i + MAX_PER_BATCH);
+    const payload = chunk.map((r) => {
+      const unsubscribeUrl = `${SITE_URL}/baja?tipo=show&token=${encodeURIComponent(r.unsubscribe_token)}`;
+      return {
+        from: FROM,
+        to: [r.email],
+        subject: asuntoRecordatorio(r),
+        html: recordatorioHtml(r, unsubscribeUrl),
+        text: recordatorioTexto(r, unsubscribeUrl),
+        headers: { "List-Unsubscribe": `<${unsubscribeUrl}>` },
+      };
+    });
+
+    try {
+      const res = await fetch(RESEND_BATCH_ENDPOINT, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        failed += chunk.length;
+        const body = await res.text();
+        firstError ??= `resend ${res.status}: ${body.slice(0, 200)}`;
+        console.error("[email] recordatorios fallaron", res.status, body.slice(0, 500));
+        continue;
+      }
+      sent += chunk.length;
+    } catch (err) {
+      failed += chunk.length;
+      firstError ??= describeError(err);
+      console.error("[email] recordatorios tiraron", err);
+    }
+  }
+
+  return { sent, failed, ...(firstError ? { error: firstError } : {}) };
+}
