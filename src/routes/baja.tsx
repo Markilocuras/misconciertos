@@ -4,13 +4,19 @@ import { BellOff, Map as MapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/baja")({
-  // `tipo=artista` llega desde los avisos por artista; sin él es el resumen de
-  // novedades, que es el único que existía cuando se escribió esta página. Son
-  // dos suscripciones distintas y se dan de baja por separado: quien se anotó a
-  // un artista puntual no pidió dejar de recibir el resumen, ni al revés.
+  // `tipo=artista` llega desde los avisos por artista y `tipo=show` desde el
+  // recordatorio del día anterior; sin él es el resumen de novedades, que es el
+  // único que existía cuando se escribió esta página. Son tres suscripciones
+  // distintas y se dan de baja por separado: quien se anotó a un artista
+  // puntual no pidió dejar de recibir el resumen, ni al revés.
   validateSearch: (search: Record<string, unknown>) => ({
     token: typeof search.token === "string" ? search.token : "",
-    tipo: search.tipo === "artista" ? ("artista" as const) : ("digest" as const),
+    tipo:
+      search.tipo === "artista"
+        ? ("artista" as const)
+        : search.tipo === "show"
+          ? ("show" as const)
+          : ("digest" as const),
   }),
   head: () => ({
     meta: [
@@ -21,8 +27,29 @@ export const Route = createFileRoute("/baja")({
   component: UnsubscribePage,
 });
 
+// Cada baja es de una cosa distinta, y la página lo tiene que decir. Hasta
+// ahora el texto hablaba siempre del resumen de novedades, así que quien
+// llegaba desde un aviso de artista leía que estaba dando de baja otra cosa.
+const COPY = {
+  digest: {
+    pregunta: "No vas a recibir más el mail con los recitales nuevos que se suman al mapa.",
+    listo:
+      "Diste de baja los avisos de recitales nuevos. Podés volver a activarlos cuando quieras desde tu perfil.",
+  },
+  artista: {
+    pregunta:
+      "No vas a recibir más el aviso cuando ese artista anuncie un show. Los otros artistas que sigas y el resumen de novedades no se tocan.",
+    listo: "Diste de baja el aviso de ese artista. Los demás siguen activos.",
+  },
+  show: {
+    pregunta: "No vas a recibir el recordatorio del día anterior a ese show.",
+    listo: "Diste de baja el recordatorio de ese show. El resto de tus avisos sigue igual.",
+  },
+} as const;
+
 function UnsubscribePage() {
   const { token, tipo } = Route.useSearch();
+  const copy = COPY[tipo];
   const [state, setState] = useState<"idle" | "sending" | "done" | "error">("idle");
 
   const confirm = async () => {
@@ -31,7 +58,9 @@ function UnsubscribePage() {
       const endpoint =
         tipo === "artista"
           ? "/api/public/hooks/unsubscribe-alert"
-          : "/api/public/hooks/unsubscribe-digest";
+          : tipo === "show"
+            ? "/api/public/hooks/unsubscribe-show"
+            : "/api/public/hooks/unsubscribe-digest";
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -53,10 +82,7 @@ function UnsubscribePage() {
         {state === "done" ? (
           <>
             <h1 className="text-xl font-bold">Listo, no te escribimos más</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Diste de baja los avisos de recitales nuevos. Podés volver a activarlos cuando quieras
-              desde tu perfil.
-            </p>
+            <p className="mt-2 text-sm text-muted-foreground">{copy.listo}</p>
           </>
         ) : !token ? (
           <>
@@ -69,9 +95,7 @@ function UnsubscribePage() {
         ) : (
           <>
             <h1 className="text-xl font-bold">¿Dejamos de avisarte?</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              No vas a recibir más el mail con los recitales nuevos que se suman al mapa.
-            </p>
+            <p className="mt-2 text-sm text-muted-foreground">{copy.pregunta}</p>
             <Button
               onClick={confirm}
               disabled={state === "sending"}

@@ -21,3 +21,22 @@ const DAY_FORMAT = new Intl.DateTimeFormat("en-CA", {
 export function todayInBuenosAires(now: Date = new Date()): string {
   return DAY_FORMAT.format(now);
 }
+
+/**
+ * Suma días a un "YYYY-MM-DD" y devuelve otro "YYYY-MM-DD".
+ *
+ * Opera sobre el string y no sobre un instante, así que el resultado es
+ * aritmética de calendario pura: no se corre por husos ni por horario de
+ * verano. Interesa porque el recordatorio compara contra `concerts.date`, que
+ * es una fecha sin hora.
+ */
+export function sumarDias(dia: string, dias: number): string {
+  const d = new Date(`${dia}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + dias);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Mañana en Buenos Aires, como "YYYY-MM-DD". */
+export function tomorrowInBuenosAires(now: Date = new Date()): string {
+  return sumarDias(todayInBuenosAires(now), 1);
+}

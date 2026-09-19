@@ -141,6 +141,7 @@ export type Database = {
           lat: number | null
           lng: number | null
           price: string | null
+          push_sent_at: string | null
           review_status: string | null
           slug: string | null
           source: string
@@ -164,6 +165,7 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           price?: string | null
+          push_sent_at?: string | null
           review_status?: string | null
           slug?: string | null
           source: string
@@ -187,6 +189,7 @@ export type Database = {
           lat?: number | null
           lng?: number | null
           price?: string | null
+          push_sent_at?: string | null
           review_status?: string | null
           slug?: string | null
           source?: string
@@ -236,6 +239,82 @@ export type Database = {
           username?: string
         }
         Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          artist: string | null
+          auth: string
+          concert_id: string | null
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          reminded_at: string | null
+        }
+        Insert: {
+          artist?: string | null
+          auth: string
+          concert_id?: string | null
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          reminded_at?: string | null
+        }
+        Update: {
+          artist?: string | null
+          auth?: string
+          concert_id?: string | null
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          reminded_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_concert_id_fkey"
+            columns: ["concert_id"]
+            isOneToOne: false
+            referencedRelation: "concerts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      show_email_reminders: {
+        Row: {
+          concert_id: string
+          created_at: string
+          email: string
+          id: string
+          reminded_at: string | null
+          unsubscribe_token: string
+        }
+        Insert: {
+          concert_id: string
+          created_at?: string
+          email: string
+          id?: string
+          reminded_at?: string | null
+          unsubscribe_token?: string
+        }
+        Update: {
+          concert_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          reminded_at?: string | null
+          unsubscribe_token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "show_email_reminders_concert_id_fkey"
+            columns: ["concert_id"]
+            isOneToOne: false
+            referencedRelation: "concerts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       saved_concerts: {
         Row: {
@@ -311,6 +390,10 @@ export type Database = {
         Returns: { email: string; unsubscribe_token: string }[]
       }
       trigger_concert_ingest: { Args: never; Returns: undefined }
+      unsubscribe_show_reminder: {
+        Args: { token: string }
+        Returns: boolean
+      }
       unsubscribe_artist_alert: {
         Args: { token: string }
         Returns: boolean

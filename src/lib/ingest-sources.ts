@@ -51,16 +51,28 @@ export function selectSources(raw: string | null | undefined): SourceSelection {
 // y por eso hay un test que verifica que el peor caso entra.
 //
 // El 14/09/2026 la cuenta pasó al plan Workers Paid y el techo pasó de 50 a
-// 1000. Eso cambia la escala del problema: 50 era una restricción que moldeaba
+// 1000. Eso cambió la escala del problema: 50 era una restricción que moldeaba
 // toda la ingesta —partirla por fuente, sacar Spotify del camino, topes de 8
-// páginas que tardaban diez corridas en cargar Live Pass—; 1000 alcanza de
-// sobra para que cada fuente recorra su listado entero en una sola corrida.
+// páginas que tardaban diez corridas en cargar Live Pass—; con 1000 cada fuente
+// recorre su listado entero en una sola corrida.
 //
-// El límite sigue existiendo y el test sigue estando: 1000 es mucho, no es
-// infinito, y una fuente que un día publique 3000 eventos lo encuentra.
+// Y desde febrero de 2026 el default de los planes pagos es 10.000, no 1000:
+// Cloudflare lo subió y de paso lo hizo configurable hasta 10 millones con
+// `limits.subrequests` en la config de Wrangler. O sea que este número ya era
+// viejo cuando se escribió lo de arriba.
+//
+// Ojo si alguna vez hay que subirlo de verdad: `limits` iría en wrangler.jsonc,
+// que en el deploy se ignora —nitro genera su propio .output/server/wrangler.json
+// y .wrangler/deploy/config.json apunta ahí—. Habría que emitirlo desde el
+// plugin de nitro en vite.config.ts.
+//
+// El límite sigue existiendo y el test sigue estando: 10.000 es mucho, no es
+// infinito, y ahora el que se acerca no es el scrapeo sino los avisos por push,
+// que gastan un subrequest por suscripción y crecen con la gente, no con las
+// fuentes.
 // ---------------------------------------------------------------------------
 
-export const TOPE_SUBREQUESTS = 1000;
+export const TOPE_SUBREQUESTS = 10_000;
 
 // Lo que gasta la invocación fuera de las fuentes: leer el secreto del cron,
 // leer las filas conocidas, un upsert por fuente que traiga algo, y los dos
@@ -127,4 +139,24 @@ export function subrequestsPeorCaso(sources: readonly IngestSource[], topes: Top
     overheadSubrequests(sources.length) +
     sources.reduce((total, s) => total + fetchesMaximos(s, topes), 0)
   );
+}
+
+/**
+ * Lo que gasta la invocación de los avisos por push (`?push=1`).
+ *
+ * Es el único costo del proyecto que crece con la cantidad de usuarios y no con
+ * la cantidad de fuentes: los push services no tienen envío en lote como Resend
+ * —que manda de a 100 por request—, así que va un POST por suscripción.
+ *
+ * Los cuatro fijos son leer el secreto, leer los conciertos sin avisar, leer las
+ * suscripciones y marcarlos; el quinto es el delete de las expiradas, que sólo
+ * ocurre si hubo alguna.
+ */
+export function subrequestsPush(suscripciones: number): number {
+  return 5 + suscripciones;
+}
+
+/** Cuántas suscripciones a push entran en una invocación. */
+export function suscripcionesPushQueEntran(tope = TOPE_SUBREQUESTS): number {
+  return tope - 5;
 }
