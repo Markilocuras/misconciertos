@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { todayInBuenosAires } from "@/lib/timezone";
+import { todayInBuenosAires, tomorrowInBuenosAires } from "@/lib/timezone";
 import { describeError } from "@/lib/describe-error";
 import { enTandas } from "@/lib/en-tandas";
 import { resolveSpotifyArtistIds } from "@/lib/spotify";
@@ -13,7 +13,17 @@ import {
   type DigestConcert,
   type DigestRecipient,
   type FuenteCaida,
+  type RecordatorioMail,
+  sendShowReminderEmails,
 } from "@/lib/email.server";
+import {
+  agruparPorDispositivo,
+  agruparRecordatorios,
+  sendArtistPushes,
+  sendShowReminders,
+  type SuscripcionPush,
+} from "@/lib/push.server";
+import { VAPID_PUBLIC_KEY, VAPID_SUBJECT } from "@/lib/site";
 import { selectSources, TOPES, type IngestSource } from "@/lib/ingest-sources";
 import {
   parseAllEventsListing,
@@ -470,6 +480,147 @@ export const Route = createFileRoute("/api/public/hooks/ingest-concerts")({
             repasados,
             alertasDeArtista: { destinatarios: porMail.size, ...alertas },
           });
+        }
+
+        // Los avisos por push salen en su propia invocación (?push=1) y no
+        // pegados al digest. Cuesta una segunda marca —push_sent_at— para la
+        // misma definición de "nuevo", y se paga a propósito: compartiendo
+        // digest_sent_at, un push service caído dejaría los conciertos sin
+        // marcar y repetiría el mail a todo el mundo en la corrida siguiente.
+        // Separados, cada canal falla y reintenta solo.
+        if (url.searchParams.get("push") === "1") {
+          const privateKey = process.env.VAPID_PRIVATE_KEY;
+
+          const { data: sinAvisar, error: sinAvisarErr } = await supabaseAdmin
+            .from("concerts")
+            .select("id, title, artist, venue, date, time, slug")
+            .is("push_sent_at", null)
+            .gte("date", today)
+            // Lo pendiente de revisión no está en el mapa: notificarlo sería
+            // mandar a la gente a un link que no existe.
+            .or("review_status.is.null,review_status.eq.aprobado")
+            .order("date", { ascending: true });
+          if (sinAvisarErr) {
+            return new Response(JSON.stringify({ error: sinAvisarErr.message }), {
+              status: 500,
+              headers: { "Content-Type": "application/json" },
+            });
+          }
+
+          const nuevos = sinAvisar ?? [];
+          const responder = (push: Record<string, unknown>) =>
+            new Response(JSON.stringify({ ok: true, push }), {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            });
+
+          if (nuevos.length === 0) return responder({ new: 0, sent: 0, failed: 0 });
+          if (!privateKey) {
+            return responder({
+              new: nuevos.length,
+              sent: 0,
+              failed: 0,
+              error: "VAPID_PRIVATE_KEY not set",
+            });
+          }
+
+          const { data: suscripciones, error: subsErr } = await supabaseAdmin
+            .from("push_subscriptions")
+            .select("artist, endpoint, p256dh, auth")
+            // La tabla ahora guarda dos cosas: seguir un artista y seguir un
+            // show. Acá sólo van las primeras; las de show las manda
+            // `?recordatorios=1`, que promete otra cosa.
+            .not("artist", "is", null);
+          if (subsErr) {
+            console.error("[ingest-concerts] push_subscriptions failed", subsErr);
+            return responder({ new: nuevos.length, sent: 0, failed: 0, error: subsErr.message });
+          }
+
+          // Mismo cruce que los avisos por mail: por slug del artista, porque
+          // cada fuente lo escribe a su manera y quien se anotó lo hizo desde la
+          // ficha de una de ellas.
+          const porArtista = new Map<string, SuscripcionPush[]>();
+          for (const s of suscripciones ?? []) {
+            // El filtro de arriba ya las dejó afuera; esto es lo que hace que
+            // el tipo cierre y el cruce no dependa de que el filtro siga ahí.
+            if (!s.artist) continue;
+            const clave = slugify(s.artist);
+            if (!porArtista.has(clave)) porArtista.set(clave, []);
+            porArtista.get(clave)!.push(s as SuscripcionPush);
+          }
+
+          const pares: Array<{ suscripcion: SuscripcionPush; concierto: DigestConcert }> = [];
+          for (const c of nuevos) {
+            if (!c.artist) continue;
+            for (const s of porArtista.get(slugify(c.artist)) ?? []) {
+              pares.push({ suscripcion: s, concierto: c as DigestConcert });
+            }
+          }
+
+          const avisos = agruparPorDispositivo(pares);
+          const resultado = await sendArtistPushes(avisos, {
+            publicKey: VAPID_PUBLIC_KEY,
+            privateKey,
+            subject: VAPID_SUBJECT,
+          });
+
+          // Las que contestaron 404/410 ya no existen del lado del navegador.
+          // Borrarlas es lo que evita reintentarlas dos veces por día para
+          // siempre, y es la única forma en que esta tabla se limpia sola.
+          let borradas = 0;
+          if (resultado.expiradas.length > 0) {
+            const { error: delErr } = await supabaseAdmin
+              .from("push_subscriptions")
+              .delete()
+              .in("endpoint", resultado.expiradas);
+            if (delErr) console.error("[ingest-concerts] limpiar push expiradas", delErr);
+            else borradas = resultado.expiradas.length;
+          }
+
+          // Misma condición que el digest: se marcan sólo si no falló ningún
+          // envío. Una suscripción expirada no cuenta como falla —es una baja,
+          // no un problema—, así que no bloquea el marcado; si lo hiciera, un
+          // teléfono viejo dejaría los conciertos sin avisar para siempre.
+          let marcados = 0;
+          if (resultado.failed === 0) {
+            const { error: marcaErr } = await supabaseAdmin
+              .from("concerts")
+              .update({ push_sent_at: new Date().toISOString() })
+              .in(
+                "id",
+                nuevos.map((c) => c.id),
+              );
+            if (marcaErr) console.error("[ingest-concerts] marcar push fallo", marcaErr);
+            else marcados = nuevos.length;
+          }
+
+          return responder({
+            new: nuevos.length,
+            dispositivos: avisos.length,
+            sent: resultado.sent,
+            failed: resultado.failed,
+            borradas,
+            marcados,
+            ...(resultado.error ? { error: resultado.error } : {}),
+          });
+        }
+
+        // Recordatorio del dia anterior: la otra promesa, la del boton
+        // "Avisame de este show".
+        //
+        // El camino normal es el Cron Trigger de Cloudflare (src/tasks/
+        // recordatorios.ts). Esto queda para dispararlo a mano sin esperar a la
+        // madrugada, y llama exactamente a la misma funcion para que no puedan
+        // divergir.
+        if (url.searchParams.get("recordatorios") === "1") {
+          const { enviarRecordatorios } = await import("@/lib/recordatorios.server");
+          return new Response(
+            JSON.stringify({ ok: true, recordatorios: await enviarRecordatorios() }),
+            {
+              status: 200,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
         }
 
         // Qué fuentes corre esta invocación. El cron manda una por vez
