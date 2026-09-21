@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { exigirAdmin } from "@/lib/admin-guard";
 import { todayInBuenosAires } from "@/lib/timezone";
 
 /**
@@ -25,24 +26,10 @@ export type EnRevision = {
   buy_url: string | null;
 };
 
-async function exigirAdmin(context: { supabase: { rpc: RpcFn }; userId: string }) {
-  const { data: isAdmin, error } = await context.supabase.rpc("has_role", {
-    _user_id: context.userId,
-    _role: "admin",
-  });
-  if (error) throw new Error(error.message);
-  if (!isAdmin) throw new Error("Forbidden");
-}
-
-type RpcFn = (
-  name: "has_role",
-  args: { _user_id: string; _role: string },
-) => Promise<{ data: boolean | null; error: { message: string } | null }>;
-
 export const listPendingReview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await exigirAdmin(context as never);
+    await exigirAdmin(context);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data, error } = await supabaseAdmin
@@ -70,7 +57,7 @@ export const resolveReview = createServerFn({ method: "POST" })
     return { id: o.id, decision: o.decision };
   })
   .handler(async ({ context, data }) => {
-    await exigirAdmin(context as never);
+    await exigirAdmin(context);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Solo se resuelve lo que está pendiente: si dos pestañas abiertas deciden
