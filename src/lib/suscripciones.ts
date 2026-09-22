@@ -37,7 +37,12 @@ export type ArtistaSeguido = {
   artist: string;
   /** Las otras grafías del mismo artista, si las hay. */
   variantes: string[];
-  personas: number;
+  /**
+   * Las direcciones, una por persona y ordenadas. Cuántas personas son es su
+   * largo: un contador aparte sería el mismo dato dos veces, y de esos dos el
+   * que se queda viejo nunca es el que se mira.
+   */
+  emails: string[];
   ultima: string;
 };
 
@@ -47,7 +52,7 @@ export type ShowSeguido = {
   venue: string | null;
   date: string | null;
   slug: string | null;
-  personas: number;
+  emails: string[];
   /** A cuántas ya les salió el recordatorio (`reminded_at`). */
   avisados: number;
   ultima: string;
@@ -58,6 +63,19 @@ export type ShowSeguido = {
 // sensible a mayúsculas— pero una sola persona, y acá lo que se cuenta es
 // gente.
 const normalizar = (email: string) => email.trim().toLowerCase();
+
+/**
+ * Las direcciones de un grupo: una por persona, ordenadas, con la grafía tal
+ * como está guardada —que es a la que le llega el mail—.
+ */
+function direcciones(filas: { email: string }[]): string[] {
+  const porPersona = new Map<string, string>();
+  for (const f of filas) {
+    const clave = normalizar(f.email);
+    if (!porPersona.has(clave)) porPersona.set(clave, f.email.trim());
+  }
+  return [...porPersona.values()].sort((a, b) => a.localeCompare(b));
+}
 
 /** Cuántas personas distintas hay en total, sin importar por dónde entraron. */
 export function contarPersonas(...listas: string[][]): number {
@@ -75,24 +93,20 @@ export function contarPersonas(...listas: string[][]): number {
  * una audiencia que en realidad recibe un solo mail.
  */
 export function resumirAvisosDeArtista(filas: FilaAvisoArtista[]): ArtistaSeguido[] {
-  const grupos = new Map<string, { filas: FilaAvisoArtista[]; emails: Set<string> }>();
+  const grupos = new Map<string, FilaAvisoArtista[]>();
 
   for (const fila of filas) {
     const slug = slugify(fila.artist);
     if (!slug) continue;
-    let grupo = grupos.get(slug);
-    if (!grupo) {
-      grupo = { filas: [], emails: new Set() };
-      grupos.set(slug, grupo);
-    }
-    grupo.filas.push(fila);
-    grupo.emails.add(normalizar(fila.email));
+    const grupo = grupos.get(slug);
+    if (grupo) grupo.push(fila);
+    else grupos.set(slug, [fila]);
   }
 
   const resumen: ArtistaSeguido[] = [];
   for (const [slug, grupo] of grupos) {
     const porNombre = new Map<string, number>();
-    for (const f of grupo.filas) porNombre.set(f.artist, (porNombre.get(f.artist) ?? 0) + 1);
+    for (const f of grupo) porNombre.set(f.artist, (porNombre.get(f.artist) ?? 0) + 1);
 
     // La grafía más usada manda; empatadas, la primera alfabéticamente. Sin el
     // desempate, el nombre que se muestra dependería del orden en que volvió la
@@ -105,31 +119,29 @@ export function resumirAvisosDeArtista(filas: FilaAvisoArtista[]): ArtistaSeguid
       slug,
       artist: nombres[0][0],
       variantes: nombres.slice(1).map(([nombre]) => nombre),
-      personas: grupo.emails.size,
-      ultima: grupo.filas.reduce((max, f) => (f.created_at > max ? f.created_at : max), ""),
+      emails: direcciones(grupo),
+      ultima: grupo.reduce((max, f) => (f.created_at > max ? f.created_at : max), ""),
     });
   }
 
-  return resumen.sort((a, b) => b.personas - a.personas || (a.ultima < b.ultima ? 1 : -1));
+  return resumen.sort(
+    (a, b) => b.emails.length - a.emails.length || (a.ultima < b.ultima ? 1 : -1),
+  );
 }
 
 /** Los recordatorios del día anterior, agrupados por show. */
 export function resumirRecordatoriosDeShow(filas: FilaRecordatorioShow[]): ShowSeguido[] {
-  const grupos = new Map<string, { filas: FilaRecordatorioShow[]; emails: Set<string> }>();
+  const grupos = new Map<string, FilaRecordatorioShow[]>();
 
   for (const fila of filas) {
-    let grupo = grupos.get(fila.concert_id);
-    if (!grupo) {
-      grupo = { filas: [], emails: new Set() };
-      grupos.set(fila.concert_id, grupo);
-    }
-    grupo.filas.push(fila);
-    grupo.emails.add(normalizar(fila.email));
+    const grupo = grupos.get(fila.concert_id);
+    if (grupo) grupo.push(fila);
+    else grupos.set(fila.concert_id, [fila]);
   }
 
   const resumen: ShowSeguido[] = [];
   for (const [concert_id, grupo] of grupos) {
-    const concierto = grupo.filas.find((f) => f.concerts)?.concerts ?? null;
+    const concierto = grupo.find((f) => f.concerts)?.concerts ?? null;
     resumen.push({
       concert_id,
       // El concierto puede haberse borrado: la FK es ON DELETE CASCADE, así que
@@ -138,15 +150,15 @@ export function resumirRecordatoriosDeShow(filas: FilaRecordatorioShow[]): ShowS
       venue: concierto?.venue ?? null,
       date: concierto?.date ?? null,
       slug: concierto?.slug ?? null,
-      personas: grupo.emails.size,
-      avisados: grupo.filas.filter((f) => f.reminded_at).length,
-      ultima: grupo.filas.reduce((max, f) => (f.created_at > max ? f.created_at : max), ""),
+      emails: direcciones(grupo),
+      avisados: grupo.filter((f) => f.reminded_at).length,
+      ultima: grupo.reduce((max, f) => (f.created_at > max ? f.created_at : max), ""),
     });
   }
 
   // Por cuánta gente espera el aviso, no por fecha: lo que se viene mirando acá
   // es qué show junta público, y la fecha ya está en su columna.
   return resumen.sort(
-    (a, b) => b.personas - a.personas || (a.date ?? "").localeCompare(b.date ?? ""),
+    (a, b) => b.emails.length - a.emails.length || (a.date ?? "").localeCompare(b.date ?? ""),
   );
 }
