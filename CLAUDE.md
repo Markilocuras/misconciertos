@@ -61,7 +61,9 @@ Build output goes to **`.output/`**, not `dist/` — `.output/server/index.mjs` 
 - `index.tsx` — the map page: loads concerts client-side via the `listConcerts` server fn, renders `ConcertMap` (Leaflet) + `DateFilter` + a `ConcertDetails` panel/sheet + `AuthMenu`.
 - `concierto.$slug.tsx` — per-concert public page (same detail blocks as the map panel, plus `ArtistAlert`).
 - `agenda.tsx` — weekly agenda listing. `auth.tsx` — sign in/up.
-- `_authenticated/route.tsx` — layout route; `beforeLoad` checks `supabase.auth.getUser()` client-side and redirects to `/auth` if unauthenticated (`ssr: false`). Children: `admin.stats.tsx` (admin-only click-stats table) and `perfil.tsx` (saved concerts + own comments).
+- `_authenticated/route.tsx` — layout route; `beforeLoad` checks `supabase.auth.getUser()` client-side and redirects to `/auth` if unauthenticated (`ssr: false`). Children: `admin.stats.tsx` (clics en "Comprar entradas" + suscripciones por mail), `admin.revision.tsx` (la cola de dudosos), `admin.comentarios.tsx` (moderación) y `perfil.tsx` (saved concerts + own comments).
+
+  Las suscripciones del panel son las **tres listas de mail** (`concert_digest_subscriptions`, `artist_alerts`, `show_email_reminders`), no el push: un mail identifica una persona y un endpoint identifica un navegador, así que sumarlos daría un número que no es ni gente ni dispositivos. Las cuentas viven en `src/lib/suscripciones.ts` —puras, con test— y lo que devuelve el server fn son números y no direcciones: para saber cuánta gente espera un aviso no hace falta mandarle la lista de mails al navegador. Los avisos por artista se agrupan por `slugify` y no por el texto crudo, porque así los agrupa el envío: "Dillom" y "DILLOM" son una sola audiencia que recibe un solo mail.
 - `api/public/hooks/*` — plain server routes (not server fns) used as webhooks: `ingest-concerts.ts` (see below) and `track-click.ts` (fire-and-forget insert into `concert_clicks` via the admin client, always returns 200).
 - `sitemap[.]xml.ts` — dynamic sitemap. `google…[.]html.ts` — Search Console verification, served at an exact URL.
 
