@@ -167,6 +167,26 @@ Tres cosas que no son obvias:
 - **El botón de reenviar tiene cuenta regresiva de 60s** porque Supabase rechaza el segundo mail al mismo destino dentro del minuto. Sin el contador, el botón invita a apretarlo y devuelve un error que parece nuestro.
 - **La URL de `emailRedirectTo` tiene que estar en la allowlist de Redirect URLs del proyecto en Supabase.** Si no está, Auth no avisa nada: manda al Site URL y listo. Es la misma trampa que ya está anotada en Deploying.
 
+**Esa allowlist se puede chequear sin entrar al dashboard**, y conviene, porque es config que vive afuera del repo y nada acá se entera si cambia. Se le pide a GoTrue una verificación con un token inválido a propósito y se mira a dónde redirige: si la URL está permitida rebota a ella, si no, cae al Site URL. No crea cuentas, no manda mails y no escribe nada.
+
+```bash
+set -a && . ./.env && set +a && curl -sS -o /dev/null -w "%{redirect_url}" -H "apikey: $SUPABASE_PUBLISHABLE_KEY" "$SUPABASE_URL/auth/v1/verify?token=invalido&type=signup&redirect_to=https://misconciertos.com.ar/" && echo
+```
+
+Para que el resultado se lea, conviene tirar primero una URL que seguro no esté permitida (`https://lo-que-sea.example/`): lo que devuelva ahí **es** el Site URL, y recién con eso se distingue "permitida" de "cayó al fallback".
+
+Estado verificado el 22/09/2026:
+
+| | |
+|---|---|
+| Site URL | `https://misconciertos.com.ar` ✓ |
+| Dominio propio | con wildcard de path (`/confirmado`, `/?x=1` se respetan) ✓ |
+| `app.misconciertos.workers.dev` | permitido ✓ |
+| `localhost:8080` | permitido ✓ — es el puerto de `.claude/launch.json` |
+| Otros puertos locales (5173) | **no** están: vite en otro puerto manda el link a producción |
+
+Nada que arreglar: el `emailRedirectTo` que manda la app es la raíz del dominio, que además de estar en la lista es el propio Site URL, así que ese caso anda incluso si alguien limpia la allowlist. De paso, la respuesta real de GoTrue confirmó el formato que parsea `interpretarFragmento` —`#error=access_denied&error_code=otp_expired&error_description=…&sb=`—, con un `sb=` de yapa que el parser ignora.
+
 **Confirmar termina en el mapa, no en `/auth`**: confirmar es un trámite y la recompensa es la app. El problema es que el mapa después de confirmar es idéntico al mapa de antes, así que sin un aviso el link del mail se siente como un clic que no hizo nada. De eso se ocupa `src/lib/auth-callback.ts`, y tiene dos detalles que se pagan caro si se tocan:
 
 - **El fragmento se lee en tiempo de import, no adentro de un efecto.** El alta usa el flujo implícito (el default de supabase-js), así que el resultado vuelve en el fragmento: `#access_token=...&type=signup` si salió bien, `#error=...&error_code=otp_expired` si el link venció. Con `detectSessionInUrl` prendido, el cliente de supabase-js se queda con los tokens y borra la URL apenas alguien lo instancia. Leerlo desde un efecto es una carrera contra eso.
