@@ -11,6 +11,7 @@ import { MapFilters } from "@/components/MapFilters";
 import { SignupInvite } from "@/components/SignupInvite";
 import { SiteFooter } from "@/components/SiteFooter";
 import { toConcert, formatConcertDate, type Concert } from "@/data/concerts";
+import { tomarVueltaDelMail } from "@/lib/auth-callback";
 import { listConcerts } from "@/lib/concerts.functions";
 import { distanceKm, formatDistance, matchesQuery } from "@/lib/concert-filters";
 import { SITE_URL } from "@/lib/site";
@@ -18,6 +19,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useNearby } from "@/hooks/use-nearby";
 import { CalendarDays, Clock, ListMusic, LocateFixed, MapPin } from "lucide-react";
 import { AuthMenu } from "@/components/AuthMenu";
+import { toast } from "sonner";
 
 // Leaflet toca window al importarse: el mapa solo existe en el cliente.
 const ConcertMap = lazy(() =>
@@ -215,6 +217,35 @@ function Index() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const nearby = useNearby();
+
+  // Confirmar el mail devuelve al mapa, y el mapa es exactamente el mismo que
+  // antes de confirmar: sin este aviso, el link del mail se siente como un clic
+  // que no hizo nada. El menú de sesión tampoco sirve de seña, porque recién
+  // muestra el usuario cuando supabase termina de leer el fragmento.
+  useEffect(() => {
+    const vuelta = tomarVueltaDelMail();
+    if (!vuelta) return;
+    // El aviso sale un tick después, y no acá mismo: sonner se suscribe a su
+    // cola dentro de un efecto del <Toaster/>, que vive en la raíz y por lo
+    // tanto corre *después* que los efectos de esta página. Un toast emitido
+    // en este mismo tick no tiene a nadie escuchando y se pierde sin dejar
+    // rastro —ni error, ni toast—, que es exactamente lo que no queremos
+    // volver a tener en el único punto donde se avisa que el mail se confirmó.
+    const id = setTimeout(() => {
+      if (vuelta.estado === "confirmado") {
+        toast.success("Listo, tu mail quedó confirmado.", {
+          description: "Ya podés guardar recitales y comentar.",
+        });
+      } else if (vuelta.estado === "vencido") {
+        toast.error("Ese link de confirmación venció.", {
+          description: "Entrá a iniciar sesión y pedí uno nuevo.",
+        });
+      } else {
+        toast.error("No pudimos confirmar tu mail.", { description: vuelta.detalle });
+      }
+    }, 0);
+    return () => clearTimeout(id);
+  }, []);
 
   // En celular la ficha sobre el mapa queda ilegible: vamos derecho a la página
   // del concierto. Sin slug no hay página, así que ahí cae al panel de siempre.

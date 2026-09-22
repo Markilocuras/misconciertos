@@ -155,6 +155,23 @@ Cada fuente reporta `found`/`scraped`/`upserted`/`discarded`/`skipped`, más `fu
 
 **`found` es el número que importa para saber si una fuente se rompió**: es lo que el parser sacó del listado antes de descartar por conocidos, por provincia o por tope de fetches. `scraped` baja a cero solo cualquier día tranquilo, así que no sirve de señal; `found: 0` significa que la fuente cambió su HTML o dejó de responder lo esperado. Cuando eso pasa, la corrida manda un mail a `ALERT_EMAIL` (ver `sendIngestAlert`) y deja un `console.warn` en el log del Worker.
 
+## El alta y la confirmación del mail
+
+Supabase exige confirmar el mail, así que `signUp` **no** devuelve sesión: la cuenta existe pero no sirve hasta que la persona abre el mail. Eso es lo que `/auth` tiene que contar bien, y durante un tiempo no lo hizo — el aviso era un toast, que se va solo a los segundos y dejaba a la persona mirando un formulario de login que la iba a rebotar.
+
+Hoy el alta cambia la pantalla entera por un estado propio (`confirmarMail` en `src/routes/auth.tsx`) que se queda ahí: dice a **qué dirección** salió el mail —sin eso no hay forma de ver el error de tipeo, que es la razón más común de que no llegue—, deja reenviarlo y ofrece volver al login. `signUp` devolviendo sesión sigue contemplado: si algún día se apaga la confirmación en Supabase, el alta entra derecho al mapa.
+
+Tres cosas que no son obvias:
+
+- **Entrar con una cuenta sin confirmar no es un error de credenciales.** Supabase contesta `email_not_confirmed`, y el login lleva a esa misma pantalla en vez de mostrar el mensaje crudo en inglés. Es el único camino de vuelta para quien cerró la pestaña sin confirmar.
+- **El botón de reenviar tiene cuenta regresiva de 60s** porque Supabase rechaza el segundo mail al mismo destino dentro del minuto. Sin el contador, el botón invita a apretarlo y devuelve un error que parece nuestro.
+- **La URL de `emailRedirectTo` tiene que estar en la allowlist de Redirect URLs del proyecto en Supabase.** Si no está, Auth no avisa nada: manda al Site URL y listo. Es la misma trampa que ya está anotada en Deploying.
+
+**Confirmar termina en el mapa, no en `/auth`**: confirmar es un trámite y la recompensa es la app. El problema es que el mapa después de confirmar es idéntico al mapa de antes, así que sin un aviso el link del mail se siente como un clic que no hizo nada. De eso se ocupa `src/lib/auth-callback.ts`, y tiene dos detalles que se pagan caro si se tocan:
+
+- **El fragmento se lee en tiempo de import, no adentro de un efecto.** El alta usa el flujo implícito (el default de supabase-js), así que el resultado vuelve en el fragmento: `#access_token=...&type=signup` si salió bien, `#error=...&error_code=otp_expired` si el link venció. Con `detectSessionInUrl` prendido, el cliente de supabase-js se queda con los tokens y borra la URL apenas alguien lo instancia. Leerlo desde un efecto es una carrera contra eso.
+- **El toast sale un tick después (`setTimeout(…, 0)`).** Sonner se suscribe a su cola dentro de un efecto del `<Toaster/>`, que vive en `__root` y por lo tanto corre *después* que los efectos de la página. Un toast emitido en el mismo tick no tiene a nadie escuchando y se pierde sin dejar rastro: ni error, ni toast. Verificado quitando el `setTimeout` y viendo desaparecer el aviso.
+
 ## El mail
 
 **Resend ya está integrado y su API key ya está en los secrets del Worker.** Lo usan el digest de novedades, los avisos por artista y el recordatorio del día anterior, los tres desde `src/lib/email.server.ts`. No hace falta evaluar proveedores ni integrar nada: si algo no llega, el problema es de configuración, no de que falte infraestructura.
