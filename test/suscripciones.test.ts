@@ -27,7 +27,7 @@ describe("resumirAvisosDeArtista", () => {
 
     expect(resumen).toHaveLength(1);
     expect(resumen[0].slug).toBe("conociendo-rusia");
-    expect(resumen[0].personas).toBe(2);
+    expect(resumen[0].emails).toEqual(["ana@ejemplo.com", "beto@ejemplo.com"]);
     expect(resumen[0].ultima).toBe("2026-09-05T10:00:00Z");
   });
 
@@ -50,7 +50,7 @@ describe("resumirAvisosDeArtista", () => {
       aviso("DILLOM", "Ana@Ejemplo.com", "2026-09-02T10:00:00Z"),
     ]);
 
-    expect(artista.personas).toBe(1);
+    expect(artista.emails).toEqual(["ana@ejemplo.com"]);
   });
 
   it("ordena por cuánta gente sigue a cada uno", () => {
@@ -61,6 +61,18 @@ describe("resumirAvisosDeArtista", () => {
     ]);
 
     expect(resumen.map((a) => a.artist)).toEqual(["Wos", "Jairo"]);
+  });
+
+  it("devuelve las direcciones ordenadas, no en el orden en que llegaron", () => {
+    // La lista se lee de arriba abajo y se compara con la de al lado: el orden
+    // de la consulta no es un orden.
+    const [artista] = resumirAvisosDeArtista([
+      aviso("Wos", "zoe@ejemplo.com", "2026-09-01T10:00:00Z"),
+      aviso("Wos", "ana@ejemplo.com", "2026-09-02T10:00:00Z"),
+      aviso("Wos", "mia@ejemplo.com", "2026-09-03T10:00:00Z"),
+    ]);
+
+    expect(artista.emails).toEqual(["ana@ejemplo.com", "mia@ejemplo.com", "zoe@ejemplo.com"]);
   });
 
   it("descarta un artista que se slugifica en nada", () => {
@@ -99,7 +111,7 @@ describe("resumirRecordatoriosDeShow", () => {
       recordatorio("cami@ejemplo.com", null),
     ]);
 
-    expect(show.personas).toBe(3);
+    expect(show.emails).toEqual(["ana@ejemplo.com", "beto@ejemplo.com", "cami@ejemplo.com"]);
     expect(show.avisados).toBe(1);
     expect(show.title).toBe("Wos en Obras");
     expect(show.slug).toBe("wos-obras");

@@ -25,8 +25,13 @@ export type ResumenSuscripciones = {
   digest: {
     /** Filas en la tabla, confirmadas o no. */
     total: number;
-    /** Las que efectivamente reciben el mail: cuenta con el mail verificado. */
-    confirmadas: number;
+    /**
+     * Las direcciones que efectivamente reciben el mail. Son sólo las
+     * confirmadas: la de una cuenta sin verificar vive en `auth.users` y la
+     * función que hace de puente la filtra, justamente porque no se le escribe.
+     * Su largo es cuántas son.
+     */
+    emails: string[];
   };
   artistas: ArtistaSeguido[];
   shows: ShowSeguido[];
@@ -35,9 +40,14 @@ export type ResumenSuscripciones = {
 /**
  * Los números de quién dejó su mail y para qué.
  *
- * Las tres tablas son PII y ninguna se lee sin ser admin. Devuelve cuentas y no
- * direcciones a propósito: para saber cuánta gente espera un aviso no hace
- * falta mandar la lista de mails al navegador.
+ * Las tres tablas son PII y ninguna se lee sin ser admin: las políticas de
+ * `artist_alerts` y `show_email_reminders` ya limitan el SELECT a `has_role`,
+ * y esto sale por el cliente service-role detrás del mismo chequeo.
+ *
+ * Las direcciones viajan con el resumen en vez de pedirse al abrir cada fila.
+ * Con estas listas —decenas, y el techo diario de Resend las deja en ~90— es
+ * una consulta menos y ninguna espera al desplegar. Si alguna vez son miles,
+ * esto pasa a ser un server fn aparte por grupo.
  *
  * Los avisos por push no entran acá: son el mismo producto por otro canal, pero
  * lo que identifica a un suscripto es distinto (un mail es una persona, un
@@ -81,7 +91,7 @@ export const getSubscriptionStats = createServerFn({ method: "GET" })
         mailsDigest,
       ),
       suscripciones: filasAlertas.length + filasRecordatorios.length + (digest.count ?? 0),
-      digest: { total: digest.count ?? 0, confirmadas: mailsDigest.length },
+      digest: { total: digest.count ?? 0, emails: mailsDigest.sort((a, b) => a.localeCompare(b)) },
       artistas: resumirAvisosDeArtista(filasAlertas),
       shows: resumirRecordatoriosDeShow(filasRecordatorios),
     };
