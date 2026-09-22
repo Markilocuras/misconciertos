@@ -23,6 +23,7 @@ import { Route as ConciertoSlugRouteImport } from './routes/concierto.$slug'
 import { Route as AuthenticatedPerfilRouteImport } from './routes/_authenticated/perfil'
 import { Route as AuthenticatedAdminStatsRouteImport } from './routes/_authenticated/admin.stats'
 import { Route as AuthenticatedAdminRevisionRouteImport } from './routes/_authenticated/admin.revision'
+import { Route as AuthenticatedAdminComentariosRouteImport } from './routes/_authenticated/admin.comentarios'
 import { Route as ApiPublicHooksUnsubscribeShowRouteImport } from './routes/api/public/hooks/unsubscribe-show'
 import { Route as ApiPublicHooksUnsubscribeDigestRouteImport } from './routes/api/public/hooks/unsubscribe-digest'
 import { Route as ApiPublicHooksUnsubscribeAlertRouteImport } from './routes/api/public/hooks/unsubscribe-alert'
@@ -101,6 +102,12 @@ const AuthenticatedAdminRevisionRoute =
     path: '/admin/revision',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedAdminComentariosRoute =
+  AuthenticatedAdminComentariosRouteImport.update({
+    id: '/admin/comentarios',
+    path: '/admin/comentarios',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const ApiPublicHooksUnsubscribeShowRoute =
   ApiPublicHooksUnsubscribeShowRouteImport.update({
     id: '/api/public/hooks/unsubscribe-show',
@@ -150,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/terminos': typeof TerminosRoute
   '/perfil': typeof AuthenticatedPerfilRoute
   '/concierto/$slug': typeof ConciertoSlugRoute
+  '/admin/comentarios': typeof AuthenticatedAdminComentariosRoute
   '/admin/revision': typeof AuthenticatedAdminRevisionRoute
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
@@ -171,6 +179,7 @@ export interface FileRoutesByTo {
   '/terminos': typeof TerminosRoute
   '/perfil': typeof AuthenticatedPerfilRoute
   '/concierto/$slug': typeof ConciertoSlugRoute
+  '/admin/comentarios': typeof AuthenticatedAdminComentariosRoute
   '/admin/revision': typeof AuthenticatedAdminRevisionRoute
   '/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
@@ -194,6 +203,7 @@ export interface FileRoutesById {
   '/terminos': typeof TerminosRoute
   '/_authenticated/perfil': typeof AuthenticatedPerfilRoute
   '/concierto/$slug': typeof ConciertoSlugRoute
+  '/_authenticated/admin/comentarios': typeof AuthenticatedAdminComentariosRoute
   '/_authenticated/admin/revision': typeof AuthenticatedAdminRevisionRoute
   '/_authenticated/admin/stats': typeof AuthenticatedAdminStatsRoute
   '/api/public/hooks/ingest-concerts': typeof ApiPublicHooksIngestConcertsRoute
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
     | '/terminos'
     | '/perfil'
     | '/concierto/$slug'
+    | '/admin/comentarios'
     | '/admin/revision'
     | '/admin/stats'
     | '/api/public/hooks/ingest-concerts'
@@ -238,6 +249,7 @@ export interface FileRouteTypes {
     | '/terminos'
     | '/perfil'
     | '/concierto/$slug'
+    | '/admin/comentarios'
     | '/admin/revision'
     | '/admin/stats'
     | '/api/public/hooks/ingest-concerts'
@@ -260,6 +272,7 @@ export interface FileRouteTypes {
     | '/terminos'
     | '/_authenticated/perfil'
     | '/concierto/$slug'
+    | '/_authenticated/admin/comentarios'
     | '/_authenticated/admin/revision'
     | '/_authenticated/admin/stats'
     | '/api/public/hooks/ingest-concerts'
@@ -390,6 +403,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRevisionRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/admin/comentarios': {
+      id: '/_authenticated/admin/comentarios'
+      path: '/admin/comentarios'
+      fullPath: '/admin/comentarios'
+      preLoaderRoute: typeof AuthenticatedAdminComentariosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/api/public/hooks/unsubscribe-show': {
       id: '/api/public/hooks/unsubscribe-show'
       path: '/api/public/hooks/unsubscribe-show'
@@ -437,12 +457,14 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedPerfilRoute: typeof AuthenticatedPerfilRoute
+  AuthenticatedAdminComentariosRoute: typeof AuthenticatedAdminComentariosRoute
   AuthenticatedAdminRevisionRoute: typeof AuthenticatedAdminRevisionRoute
   AuthenticatedAdminStatsRoute: typeof AuthenticatedAdminStatsRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedPerfilRoute: AuthenticatedPerfilRoute,
+  AuthenticatedAdminComentariosRoute: AuthenticatedAdminComentariosRoute,
   AuthenticatedAdminRevisionRoute: AuthenticatedAdminRevisionRoute,
   AuthenticatedAdminStatsRoute: AuthenticatedAdminStatsRoute,
 }

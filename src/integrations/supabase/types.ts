@@ -61,6 +61,8 @@ export type Database = {
           artist: string
           body: string
           created_at: string
+          deleted_at: string | null
+          deleted_by: string | null
           id: string
           user_id: string
         }
@@ -68,6 +70,8 @@ export type Database = {
           artist: string
           body: string
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           user_id: string
         }
@@ -75,6 +79,8 @@ export type Database = {
           artist?: string
           body?: string
           created_at?: string
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           user_id?: string
         }

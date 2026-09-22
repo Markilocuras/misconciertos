@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { BarChart3, LogOut, User as UserIcon, ShieldQuestion } from "lucide-react";
+import { BarChart3, LogOut, MessagesSquare, User as UserIcon, ShieldQuestion } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -84,6 +84,11 @@ export function AuthMenu({ className, compact }: AuthMenuProps = {}) {
             >
               <Link to="/admin/revision">
                 <ShieldQuestion className="h-3.5 w-3.5" />
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="ghost" className="h-7 px-2" title="Comentarios">
+              <Link to="/admin/comentarios">
+                <MessagesSquare className="h-3.5 w-3.5" />
               </Link>
             </Button>
           </>
