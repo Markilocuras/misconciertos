@@ -74,6 +74,47 @@ export function selectSources(raw: string | null | undefined): SourceSelection {
 
 export const TOPE_SUBREQUESTS = 10_000;
 
+// ---------------------------------------------------------------------------
+// Reintentos
+//
+// Un 502 de un segundo no puede costar doce horas de una fuente. Antes costaba:
+// el listado es lo primero que se pide y de ahí sale todo lo demás, así que un
+// único error pasajero volteaba la fuente entera hasta la corrida siguiente y
+// mandaba el mail de aviso. Pasó con tuentrada el 29/09/2026, y cuando se fue a
+// mirar el sitio contestaba 200 desde las dos redes.
+//
+// El costo se paga en subrequests, que es lo que `subrequestsPeorCaso` cuenta:
+// el techo de cada fuente se multiplica por los intentos. Con los topes de hoy
+// eso deja el peor caso de las seis juntas cerca de 1.600 sobre 10.000, así que
+// entra igual de holgado que antes.
+//
+// Lo otro que se paga es tiempo, y ahí el número que importa no es el techo de
+// Cloudflare sino los 60s a los que corta el `net.http_post` del cron —el
+// Worker termina igual, pero queda registrado como timeout y parece una falla
+// que no fue—. Por eso las esperas son cortas: un fetch que muere agrega 1,2s,
+// y los de ficha van de a seis con `enTandas`, que lo amortiza.
+// ---------------------------------------------------------------------------
+
+/** Cuántas veces se pide una URL antes de darla por perdida. */
+export const INTENTOS_POR_FETCH = 3;
+
+/** Lo que se espera antes de cada reintento. Uno menos que los intentos. */
+export const ESPERAS_REINTENTO_MS = [300, 900] as const;
+
+/**
+ * Si vale la pena volver a pedir lo mismo.
+ *
+ * Sólo se reintenta lo que puede cambiar solo: 5xx, el 429 de rate limit y el
+ * 408 de timeout. Un 4xx es determinístico —la URL no existe, o nos
+ * bloquearon— y pedirlo de nuevo gasta un subrequest para llegar a la misma
+ * respuesta, más lento. El 403 queda afuera a propósito aunque a veces sea
+ * intermitente: cuando una fuente empieza a bloquearnos, lo que hay que hacer
+ * es enterarse, no insistir.
+ */
+export function esEstadoPasajero(status: number): boolean {
+  return status >= 500 || status === 429 || status === 408;
+}
+
 // Lo que gasta la invocación fuera de las fuentes: leer el secreto del cron,
 // leer las filas conocidas, un upsert por fuente que traiga algo, y los dos
 // que puede costar el mail de aviso si alguna vino vacía.
@@ -134,10 +175,18 @@ export function fetchesMaximos(source: IngestSource, topes: Topes): number {
 }
 
 // Lo que gastaría, como techo, una invocación que corre estas fuentes.
-export function subrequestsPeorCaso(sources: readonly IngestSource[], topes: Topes): number {
+//
+// Los fetches a las fuentes van multiplicados por los intentos: el peor caso es
+// que cada uno falle con algo pasajero las tres veces. El overhead no, porque
+// son llamadas a Supabase y mails, que no pasan por el reintento.
+export function subrequestsPeorCaso(
+  sources: readonly IngestSource[],
+  topes: Topes,
+  intentos: number = INTENTOS_POR_FETCH,
+): number {
   return (
     overheadSubrequests(sources.length) +
-    sources.reduce((total, s) => total + fetchesMaximos(s, topes), 0)
+    intentos * sources.reduce((total, s) => total + fetchesMaximos(s, topes), 0)
   );
 }
 
