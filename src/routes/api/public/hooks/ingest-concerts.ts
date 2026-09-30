@@ -25,6 +25,7 @@ import {
 } from "@/lib/push.server";
 import { VAPID_PUBLIC_KEY, VAPID_SUBJECT } from "@/lib/site";
 import { selectSources, TOPES, type IngestSource } from "@/lib/ingest-sources";
+import { fetchConReintentos } from "@/lib/fetch-con-reintentos";
 import {
   parseAllEventsListing,
   isBuenosAiresRegion,
@@ -82,14 +83,14 @@ const BROWSER_HEADERS = {
 };
 
 async function fetchHtml(url: string): Promise<string> {
-  const res = await fetch(url, { headers: BROWSER_HEADERS });
-  if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`);
+  const res = await fetchConReintentos(url, { headers: BROWSER_HEADERS });
   return res.text();
 }
 
 async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetch(url, { headers: { ...BROWSER_HEADERS, accept: "application/json" } });
-  if (!res.ok) throw new Error(`GET ${url} -> ${res.status}`);
+  const res = await fetchConReintentos(url, {
+    headers: { ...BROWSER_HEADERS, accept: "application/json" },
+  });
   return res.json();
 }
 
