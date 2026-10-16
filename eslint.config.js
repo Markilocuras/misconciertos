@@ -6,7 +6,11 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi"] },
+  // `.claude/worktrees/` son copias del repo que Claude Code crea por sesión:
+  // código viejo que ya no es el del proyecto. Sin ignorarlas el lint las
+  // recorre igual y reporta dos veces lo mismo —o falla por un archivo que acá
+  // ya está arreglado—.
+  { ignores: ["dist", ".output", ".vinxi", ".claude"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
