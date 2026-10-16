@@ -9,3 +9,10 @@ routeTree.gen.ts
 # Lo genera el CLI de Supabase con su propio formato: si prettier lo toca, el
 # diff son 600 líneas de comillas y punto y coma que se pierden al regenerarlo.
 src/integrations/supabase/types.ts
+
+# La respuesta real de cada fuente, congelada. Formatearlas las deja de ser
+# eso: el parseo de hoy no cambia —está medido— pero el fixture ya no es lo que
+# la fuente contesta, y un parser sensible a los espacios quedaría "verificado"
+# contra HTML que nadie sirvió nunca. Además son 10 archivos de ruido en cada
+# `bun run format`.
+test/fixtures/
