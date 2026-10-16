@@ -290,12 +290,27 @@ describe("sendPushBatch", () => {
     const res = await sendPushBatch(subs, () => "hola", CLAVES);
     expect(res).toMatchObject({ sent: 3, failed: 0, expiradas: [] });
 
-    const auth = fetchMock.mock.calls.map(
-      ([, init]) => ((init as RequestInit).headers as Record<string, string>).Authorization,
+    // Por endpoint y no por posición. `sendPushBatch` manda con `enTandas`, o
+    // sea concurrente, así que el orden en que llegan los fetch es una carrera
+    // entre las firmas y no el orden de `subs`: el token de Firefox puede caer
+    // en el medio de los dos de Chrome. Indexando por posición este test daba
+    // rojo una corrida de cada tantas, que es la peor forma de fallar —entrena
+    // a reintentar hasta que pase, justo en la suite que cubre la parte del
+    // push donde un error no se ve.
+    const authPorEndpoint = new Map(
+      (fetchMock.mock.calls as Array<[string, RequestInit]>).map(([url, init]) => [
+        url,
+        (init.headers as Record<string, string>).Authorization,
+      ]),
     );
+    expect(authPorEndpoint.size).toBe(3);
+    const chrome1 = authPorEndpoint.get("https://fcm.googleapis.com/fcm/send/1");
+    const chrome2 = authPorEndpoint.get("https://fcm.googleapis.com/fcm/send/2");
+    const firefox = authPorEndpoint.get("https://updates.push.services.mozilla.com/wpush/v2/3");
     // Las dos de Chrome comparten token; la de Firefox tiene el suyo.
-    expect(auth[0]).toBe(auth[1]);
-    expect(auth[2]).not.toBe(auth[0]);
+    expect(chrome1).toMatch(/^vapid t=/);
+    expect(chrome2).toBe(chrome1);
+    expect(firefox).not.toBe(chrome1);
   });
 
   it("separa las expiradas de las que fallaron de verdad", async () => {
